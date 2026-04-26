@@ -1,0 +1,48 @@
+/* Materiales page */
+.materiales-filters {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.text-right { text-align: right; }
+
+.material-name { font-weight: 500; }
+
+/* Resaltar filas según estado */
+.material-row--urge    { background: rgba(248,81,73,0.04); }
+.material-row--ordenar { background: rgba(210,153,34,0.04); }
+
+.stock-number--urge    { color: var(--color-urge); font-weight: 700; }
+.stock-number--ordenar { color: var(--color-ordenar); font-weight: 600; }
+
+.materiales-empty {
+  text-align: center;
+  padding: var(--space-10);
+  color: var(--color-text-muted);
+}
+
+/* Simple modal styles for ReportModal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+.modal-card {
+  background: white;
+  border-radius: 6px;
+  width: 420px;
+  max-width: calc(100% - 32px);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.15);
+  overflow: hidden;
+}
+.modal-header { padding: 12px 16px; border-bottom: 1px solid #eee; }
+.modal-body { padding: 16px; }
+.modal-footer { padding: 12px 16px; border-top: 1px solid #eee; text-align: right; }
+.modal-body ul { list-style: none; padding: 0; margin: 0; }
+.modal-body li { margin-bottom: 8px; }

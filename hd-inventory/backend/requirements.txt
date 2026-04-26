@@ -1,0 +1,23 @@
+# ─── HD-Inventory Backend — Dependencias Python ─────────────
+# Django y DRF
+Django==5.2
+djangorestframework==3.16.0
+djangorestframework-simplejwt==5.4.0
+
+# Base de datos
+psycopg2-binary
+# CORS
+django-cors-headers==4.7.0
+
+# Filtros
+django-filter==25.1
+
+# Variables de entorno
+python-decouple
+
+# Servidor de producción
+gunicorn
+
+# Utilidades
+Pillow
+openpyxl

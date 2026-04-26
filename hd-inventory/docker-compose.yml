@@ -1,0 +1,71 @@
+version: '3.9'
+
+services:
+  # ─── Base de Datos PostgreSQL ───────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: hdinventory_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Backend Django ─────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hdinventory_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=db
+    volumes:
+      - ./backend:/app
+      - ./media:/app/media          # bind-mount local: las imágenes persisten siempre
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+
+  # ─── Frontend React + Vite ──────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hdinventory_frontend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Polling necesario para HMR en Docker sobre Windows/WSL
+      - CHOKIDAR_USEPOLLING=true
+      - VITE_POLL=true
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+    name: hdinventory_pgdata
+  # hdinventory_media ya no se necesita como volumen Docker
+  # Las imágenes ahora viven en ./media/ en tu máquina local
