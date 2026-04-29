@@ -24,6 +24,13 @@ class User(AbstractUser):
         verbose_name='Rol',
     )
 
+    avatar = models.ImageField(
+        upload_to='avatars/',
+        null=True,
+        blank=True,
+        verbose_name='Imagen de perfil'
+    )
+
     class Meta:
         verbose_name = 'Usuario'
         verbose_name_plural = 'Usuarios'

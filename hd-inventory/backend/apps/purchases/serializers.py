@@ -1,6 +1,13 @@
 """purchases/serializers.py"""
 from rest_framework import serializers
-from .models import OrdenCompra
+from .models import OrdenCompra, Proveedor
+
+
+class ProveedorSerializer(serializers.ModelSerializer):
+    """Serializer para el modelo de Proveedor."""
+    class Meta:
+        model = Proveedor
+        fields = '__all__'
 
 
 class OrdenCompraSerializer(serializers.ModelSerializer):
@@ -10,6 +17,7 @@ class OrdenCompraSerializer(serializers.ModelSerializer):
     status_label         = serializers.SerializerMethodField()
     creado_por_nombre    = serializers.SerializerMethodField()
     actualizado_por_nombre = serializers.SerializerMethodField()
+    proveedor_nombre     = serializers.ReadOnlyField(source='proveedor_ref.nombre')
 
     class Meta:
         model  = OrdenCompra
@@ -30,6 +38,8 @@ class OrdenCompraSerializer(serializers.ModelSerializer):
             'fecha_recibido',
             'tiempo_entrega_dias',
             'vendedor',
+            'proveedor_ref',
+            'proveedor_nombre',
             'comentarios',
             'creado_por',
             'creado_por_nombre',
@@ -43,6 +53,7 @@ class OrdenCompraSerializer(serializers.ModelSerializer):
             'fecha_aprobacion', 'fecha_recibido',
             'creado_en', 'actualizado_en',
             'creado_por', 'actualizado_por',
+            'proveedor_nombre',
         ]
 
     def get_status_label(self, obj):
@@ -64,6 +75,7 @@ class OrdenCompraListSerializer(serializers.ModelSerializer):
     costo_total         = serializers.ReadOnlyField()
     tiempo_entrega_dias = serializers.ReadOnlyField()
     status_label        = serializers.SerializerMethodField()
+    proveedor_nombre    = serializers.ReadOnlyField(source='proveedor_ref.nombre')
 
     class Meta:
         model  = OrdenCompra
@@ -83,6 +95,8 @@ class OrdenCompraListSerializer(serializers.ModelSerializer):
             'fecha_recibido',
             'tiempo_entrega_dias',
             'vendedor',
+            'proveedor_ref',
+            'proveedor_nombre',
             'comentarios',
             'actualizado_en',
         ]

@@ -4,7 +4,7 @@ import { cleanBadgeID } from '../../utils/formatters'
 import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
 import './Despachar.css'
-
+import ValeModal from '../Vales/ValeModal'
 export default function Despachar() {
   const notify = useToast()
   const { user } = useAuth()
@@ -16,6 +16,7 @@ export default function Despachar() {
   const [cart, setCart] = useState([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
+  const [showVale, setShowVale] = useState(false)
   const searchInputRef = useRef(null)
 
   // Opciones
@@ -35,6 +36,7 @@ export default function Despachar() {
 
   useEffect(() => {
     fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const lookupEmpleado = async (numero) => {
@@ -66,7 +68,7 @@ export default function Despachar() {
 
   const fetchData = async () => {
     try {
-      const [matRes, optsRes, catRes, secRes] = await Promise.all([
+      const [matRes, optsRes, catRes] = await Promise.all([
         client.get('/materials/?page_size=1000'),
         client.get('/inventory/salidas/choices/'),
         client.get('/materials/categorias/'),
@@ -134,6 +136,7 @@ export default function Despachar() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [materials])
 
   const handleScan = (code) => {
@@ -273,6 +276,10 @@ export default function Despachar() {
               <h2 style={{ margin: 0 }}>Modo Despacho</h2>
               <span style={{ color: 'var(--text-muted)' }}>Busca, escanea o selecciona</span>
             </div>
+            <button className="btn btn-primary" onClick={() => setShowVale(true)}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2z"></path><line x1="13" y1="5" x2="13" y2="21"></line></svg>
+              Crear Vale
+            </button>
           </div>
 
           <div className="category-pills">
@@ -479,6 +486,7 @@ export default function Despachar() {
           </button>
         </div>
       </div>
+      <ValeModal open={showVale} onClose={() => setShowVale(false)} />
     </div>
   )
 }

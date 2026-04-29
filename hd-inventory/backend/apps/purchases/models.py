@@ -17,6 +17,25 @@ from django.conf import settings
 from django.utils import timezone
 
 
+class Proveedor(models.Model):
+    """Modelo para gestionar proveedores del almacén."""
+    nombre = models.CharField(max_length=200, unique=True, verbose_name='Nombre')
+    contacto = models.CharField(max_length=200, blank=True, verbose_name='Persona de Contacto')
+    telefono = models.CharField(max_length=50, blank=True, verbose_name='Teléfono')
+    email = models.EmailField(blank=True, verbose_name='Email')
+    direccion = models.TextField(blank=True, verbose_name='Dirección')
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Proveedor'
+        verbose_name_plural = 'Proveedores'
+        ordering = ['nombre']
+
+    def __str__(self):
+        return self.nombre
+
+
 class OrdenCompra(models.Model):
 
     STATUS_CHOICES = [
@@ -87,7 +106,15 @@ class OrdenCompra(models.Model):
     )
 
     # ─── Proveedor / Logística ────────────────────────────────
-    vendedor        = models.CharField(max_length=200, blank=True, verbose_name='Vendedor / Proveedor')
+    vendedor        = models.CharField(max_length=200, blank=True, verbose_name='Vendedor (Texto)')
+    proveedor_ref   = models.ForeignKey(
+        Proveedor,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ordenes',
+        verbose_name='Proveedor Relacionado'
+    )
     comentarios     = models.TextField(blank=True, verbose_name='Comentarios')
 
     # ─── Auditoría ────────────────────────────────────────────

@@ -1,4 +1,4 @@
-"""purchases/views.py — ViewSet de Órdenes de Compra."""
+"""purchases/views.py — ViewSet de Órdenes de Compra y Proveedores."""
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -6,8 +6,19 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 
 from apps.accounts.permissions import IsSupervisorOrAbove
-from .models import OrdenCompra
-from .serializers import OrdenCompraSerializer, OrdenCompraListSerializer
+from .models import OrdenCompra, Proveedor
+from .serializers import OrdenCompraSerializer, OrdenCompraListSerializer, ProveedorSerializer
+
+
+class ProveedorViewSet(viewsets.ModelViewSet):
+    """ViewSet para gestionar proveedores."""
+    permission_classes = [IsSupervisorOrAbove]
+    queryset = Proveedor.objects.all()
+    serializer_class = ProveedorSerializer
+    filter_backends = [SearchFilter, OrderingFilter]
+    search_fields = ['nombre', 'contacto', 'email']
+    ordering_fields = ['nombre', 'creado_en']
+    ordering = ['nombre']
 
 
 class OrdenCompraViewSet(viewsets.ModelViewSet):
@@ -16,9 +27,9 @@ class OrdenCompraViewSet(viewsets.ModelViewSet):
     Acceso: Supervisor y Manager.
     """
     permission_classes = [IsSupervisorOrAbove]
-    queryset           = OrdenCompra.objects.select_related('material', 'creado_por', 'actualizado_por')
+    queryset           = OrdenCompra.objects.select_related('material', 'creado_por', 'actualizado_por', 'proveedor_ref')
     filter_backends    = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields   = ['status', 'moneda', 'vendedor']
+    filterset_fields   = ['status', 'moneda', 'vendedor', 'proveedor_ref']
     search_fields      = ['no_parte', 'descripcion', 'po_number', 'vendedor']
     ordering_fields    = ['fecha_emision', 'status', 'costo_unitario', 'actualizado_en']
     ordering           = ['-fecha_emision']

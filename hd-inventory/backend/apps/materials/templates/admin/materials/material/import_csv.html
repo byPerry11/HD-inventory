@@ -1,0 +1,294 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static admin_modify %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    .import-container {
+        max-width: 1200px;
+        margin: 20px auto;
+        padding: 30px;
+        background: #ffffff !important; /* Forzado blanco */
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        color: #111827;
+    }
+
+    .import-header {
+        border-bottom: 2px solid #f0f2f5;
+        margin-bottom: 25px;
+        padding-bottom: 15px;
+    }
+
+    .import-header h1 {
+        margin: 0;
+        color: #111827; /* Oscurecido para mayor contraste */
+        font-weight: 700;
+        font-size: 24px;
+    }
+
+    .import-header p {
+        color: #374151; /* Oscurecido de #697386 a #374151 */
+        margin-top: 5px;
+    }
+
+    .drop-zone {
+        border: 2px dashed #4b5563; /* Mucho más oscuro */
+        border-radius: 8px;
+        padding: 40px;
+        text-align: center;
+        transition: all 0.3s ease;
+        background: #f9fafb;
+        margin-bottom: 20px;
+    }
+
+    .drop-zone p {
+        color: #111827 !important; /* Texto principal de la zona */
+        font-weight: 500;
+    }
+
+    .drop-zone:hover {
+        border-color: #6366f1;
+        background: #f8f9ff;
+    }
+
+    .btn-premium {
+        background: #4f46e5; /* De #6366f1 a #4f46e5 para mejor contraste */
+        color: white;
+        padding: 12px 24px;
+        border-radius: 6px;
+        border: none;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.2s, background 0.2s;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-premium:hover {
+        background: #3730a3; /* Más oscuro para hover */
+        transform: translateY(-1px);
+        color: white;
+    }
+
+    .btn-secondary {
+        background: #e5e7eb;
+        color: #111827 !important; /* Texto negro */
+        padding: 12px 24px;
+        border-radius: 6px;
+        border: 1px solid #9ca3af;
+        font-weight: 700;
+        cursor: pointer;
+        margin-right: 10px;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-secondary:hover {
+        background: #d1d5db;
+        color: #000 !important;
+    }
+
+    .preview-table-container {
+        margin-top: 30px;
+        overflow-x: auto;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+    }
+
+    .preview-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+
+    .preview-table th {
+        background: #f3f4f6; /* Un poco más oscuro que #f9fafb */
+        padding: 12px 15px;
+        text-align: left;
+        font-weight: 700; /* Más grueso */
+        color: #111827; /* De #4b5563 a #111827 */
+        border-bottom: 2px solid #d1d5db;
+    }
+
+    .preview-table td {
+        padding: 12px 15px;
+        border-bottom: 1px solid #d1d5db;
+        color: #111827 !important;
+        background: #ffffff !important; /* Fondo blanco para las celdas */
+    }
+
+    .preview-table code {
+        background: #f3f4f6;
+        color: #1e40af !important; /* Azul oscuro para códigos */
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 700;
+    }
+
+    .status-badge {
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .status-new {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .status-update {
+        background: #fef9c3;
+        color: #854d0e;
+    }
+
+    .alert {
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+
+    .alert-info {
+        background: #eff6ff;
+        color: #1e3a8a !important; 
+        border: 2px solid #3b82f6;
+    }
+
+    .alert-info code {
+        color: #111827 !important;
+        background: #dbeafe;
+        font-weight: 800;
+    }
+
+    .alert-success {
+        background: #ecfdf5;
+        color: #064e3b !important;
+        border: 2px solid #10b981;
+    }
+
+    .alert-error {
+        background: #fef2f2;
+        color: #7f1d1d !important;
+        border: 2px solid #ef4444;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <div class="import-container">
+        <div class="import-header">
+            <h1>{% trans "Importar Materiales desde CSV" %}</h1>
+            <p>{% trans "Carga masiva de inventario inicial para el almacén." %}</p>
+        </div>
+
+        {% if not preview_data %}
+        <form action="." method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="alert alert-info">
+                <strong>Tip:</strong> El archivo debe incluir columnas como <code>Code</code>, <code>Name</code>,
+                <code>Unidad</code>, <code>Stock</code> y <code>Ubicacion</code>.
+            </div>
+
+            <div class="drop-zone" id="drop-zone">
+                <p>Arrastre su archivo CSV aquí o</p>
+                <input type="file" name="csv_file" id="id_csv_file" style="display: none;" accept=".csv">
+                <button type="button" class="btn-premium" onclick="document.getElementById('id_csv_file').click()">
+                    Seleccionar Archivo
+                </button>
+                <p id="file-name" style="margin-top: 10px; font-weight: 600; color: #4f46e5;"></p>
+            </div>
+
+            <div style="text-align: right;">
+                <a href="../" class="btn-secondary">Cancelar</a>
+                <button type="submit" class="btn-premium">Subir y Previsualizar</button>
+            </div>
+        </form>
+        {% else %}
+        <div class="alert alert-success">
+            Se han detectado <strong>{{ preview_data|length }}</strong> materiales listos para procesar.
+        </div>
+
+        <form action="." method="post">
+            {% csrf_token %}
+            <input type="hidden" name="confirm_import" value="1">
+            {# Pasamos los datos serializados o los guardamos en sesión. Por simplicidad en este MVP, usaremos un campo
+            oculto con JSON o simplemente volveremos a procesar el archivo si lo guardamos temporalmente. Pero lo más
+            limpio para una previsualización real es confirmación. #}
+            <input type="hidden" name="data_json" value="{{ data_json }}">
+
+            <div class="preview-table-container">
+                <table class="preview-table">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Nombre</th>
+                            <th>Categoría</th>
+                            <th>Unidad</th>
+                            <th>Stock</th>
+                            <th>Ubicación</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in preview_data|slice:":50" %}
+                        <tr>
+                            <td><code>{{ item.code }}</code></td>
+                            <td>{{ item.name }}</td>
+                            <td>{{ item.category|default:"-" }}</td>
+                            <td>{{ item.unit }}</td>
+                            <td>{{ item.stock_actual }}</td>
+                            <td>{{ item.ubicacion|default:"-" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if preview_data|length > 50 %}
+            <p style="color: #6b7280; font-size: 13px; margin-top: 10px;">
+                * Mostrando solo los primeros 50 registros de {{ preview_data|length }}.
+            </p>
+            {% endif %}
+
+            <div style="text-align: right; margin-top: 30px;">
+                <a href="." class="btn-secondary">Atrás</a>
+                <button type="submit" class="btn-premium">Confirmar e Importar Todo</button>
+            </div>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    document.getElementById('id_csv_file')?.addEventListener('change', function (e) {
+        if (e.target.files.length > 0) {
+            document.getElementById('file-name').textContent = 'Seleccionado: ' + e.target.files[0].name;
+        }
+    });
+
+    const dropZone = document.getElementById('drop-zone');
+    if (dropZone) {
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#6366f1';
+            dropZone.style.background = '#f8f9ff';
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.style.borderColor = '#dcdfe4';
+            dropZone.style.background = '#fcfdfe';
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                document.getElementById('id_csv_file').files = files;
+                document.getElementById('file-name').textContent = 'Seleccionado: ' + files[0].name;
+            }
+        });
+    }
+</script>
+{% endblock %}

@@ -1,4 +1,3 @@
-import React from 'react'
 import api from '../../api/client'
 
 export default function ReportModal({ onClose }) {

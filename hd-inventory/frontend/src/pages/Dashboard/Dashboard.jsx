@@ -6,8 +6,6 @@ import {
 import api from '../../api/client'
 import './Dashboard.css'
 
-const COLORS = ['#1f6feb','#3fb950','#d29922','#f85149','#58a6ff','#bc8cff','#ffa657']
-
 export default function Dashboard() {
   const [resumen, setResumen]         = useState(null)
   const [alertas, setAlertas]         = useState({ urge: [], ordenar: [] })

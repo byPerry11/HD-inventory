@@ -15,6 +15,12 @@ class MeView(APIView):
         serializer = UserSerializer(request.user)
         return Response(serializer.data)
 
+    def patch(self, request):
+        serializer = UserSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
 
 class LogoutView(APIView):
     """Revoca el refresh token del usuario."""

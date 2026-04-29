@@ -40,11 +40,9 @@ export default function OrdenesCompra() {
     'cancelado':    { bg: 'var(--color-urge-bg)',    fg: 'var(--color-urge)' },
   }
 
-  const MONEDAS = ['MXN', 'USD']
-  const STATUSES = ['en_proceso', 'ordenado', 'pr_aprobada', 'po_aprobada', 'rem_recibido', 'recibido', 'cancelado']
-
   useEffect(() => {
     fetchOrdenes()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchOrdenes = async () => {
@@ -517,7 +515,10 @@ export default function OrdenesCompra() {
         <div className="modal-overlay" onClick={() => setShowConfirmReceived(false)}>
           <div className="modal-content modal-content--confirm" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 className="modal-title">⚠️ Confirmar Recepción de Material</h2>
+              <h2 className="modal-title flex items-center gap-2">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-warning)' }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                Confirmar Recepción de Material
+              </h2>
               <button className="btn-close" onClick={() => setShowConfirmReceived(false)}>&times;</button>
             </div>
             <div className="modal-body p-6">

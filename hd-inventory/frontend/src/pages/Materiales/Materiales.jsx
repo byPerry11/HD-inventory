@@ -5,8 +5,6 @@ import './Materiales.css'
 import MaterialModal from './MaterialModal'
 import ReportModal from './ReportModal'
 
-const ESTADOS = ['', 'ok', 'ordenar', 'urge']
-
 export default function Materiales() {
   const { user } = useAuth()
   const isManager = user?.role === 'manager'

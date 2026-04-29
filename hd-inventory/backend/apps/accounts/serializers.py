@@ -13,7 +13,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'first_name', 'last_name',
-            'email', 'role', 'role_display', 'is_active',
+            'email', 'role', 'role_display', 'is_active', 'avatar',
         ]
         read_only_fields = ['id', 'role', 'is_active']
 

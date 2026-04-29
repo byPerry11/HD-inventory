@@ -53,10 +53,6 @@ export default function ValeModal({ open, onClose, preselectedMaterial }) {
     setSearch(m.code + ' — ' + m.name)
   }
 
-  const handlePrint = (vale) => {
-    printVale(vale)
-  }
-
   const handleChange = (e) => {
     const { name, value } = e.target
     
@@ -104,7 +100,10 @@ export default function ValeModal({ open, onClose, preselectedMaterial }) {
     <div className="modal-backdrop" onClick={() => onClose(false)}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <header className="modal-header">
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>🎟️ Crear Vale de Consumo</h2>
+          <h2 className="flex items-center gap-2" style={{ fontSize: '1.25rem', fontWeight: 600 }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2z"></path><line x1="13" y1="5" x2="13" y2="21"></line></svg>
+            Crear Vale de Consumo
+          </h2>
           <button className="modal-close" onClick={() => onClose(false)}>×</button>
         </header>
         
@@ -246,7 +245,12 @@ export default function ValeModal({ open, onClose, preselectedMaterial }) {
               className="btn btn-primary" 
               disabled={loading || !form.material}
             >
-              {loading ? 'Generando...' : '🖨️ Crear e Imprimir'}
+              {loading ? 'Generando...' : (
+                <span className="flex-center gap-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                  Crear e Imprimir
+                </span>
+              )}
             </button>
           </div>
         </form>
