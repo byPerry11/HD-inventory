@@ -99,6 +99,13 @@ def process_import(data):
                 else:
                     item['unit'] = unit
 
+                # Normalizar ubicación
+                if 'ubicacion' in item and item['ubicacion']:
+                    ub = item['ubicacion'].strip().upper()
+                    # Reemplazar LOCKER o LOKER por "Locker" como prefijo estándar
+                    ub = ub.replace('LOCKER', 'Locker').replace('LOKER', 'Locker')
+                    item['ubicacion'] = ub
+
                 obj, created = Material.objects.update_or_create(
                     code=code,
                     defaults={

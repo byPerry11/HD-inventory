@@ -15,7 +15,7 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me')
 DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
-    default='localhost,127.0.0.1,backend,0.0.0.0',
+    default='localhost,127.0.0.1,backend,0.0.0.0,mxtjsf225,mxtjsf225.tpvaoc.com,mxtj225.inventory',
     cast=Csv()
 )
 
@@ -108,7 +108,7 @@ REST_FRAMEWORK = {
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'DEFAULT_PAGINATION_CLASS': 'core_main_hdinventory.pagination.CustomPagination',
     'PAGE_SIZE': 50,
 }
 
@@ -126,6 +126,10 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
     'http://localhost:3000',
+    'http://mxtjsf225:5173',
+    'http://mxtjsf225.tpvaoc.com:5173',
+    'http://mxtjsf225.tpvaoc.com:8000',
+    'http://mxtj225.inventory',
 ]
 CORS_ALLOW_CREDENTIALS = True
 

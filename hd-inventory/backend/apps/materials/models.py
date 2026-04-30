@@ -70,10 +70,10 @@ class Material(models.Model):
     )
     descripcion = models.TextField(blank=True, verbose_name='Descripción')
     ubicacion = models.CharField(
-        max_length=20,
+        max_length=100,
         blank=True,
         verbose_name='Ubicación en almacén',
-        help_text='Posición en estante. Formato: número-letra (ej. 13-B)',
+        help_text='Posición o referencia en estante (ej. Locker 13-B, LOKER-amarillo)',
     )
 
     # ─── Stock ───────────────────────────────────────────────
