@@ -231,7 +231,7 @@ export default function MaterialModal({ material, onClose, onSaved }) {
             <label>
               Ubicación en Almacén
               <span style={{ color: 'var(--color-text-secondary)', fontWeight: 400, marginLeft: 6 }}>
-                — estante + posición (ej. <code style={{ fontSize: '0.85em' }}>13-B</code>)
+                — (ej. <code style={{ fontSize: '0.85em' }}>Locker 13-B</code>, <code style={{ fontSize: '0.85em' }}>5-A</code>)
               </span>
             </label>
             <div style={{ position: 'relative' }}>
@@ -247,12 +247,12 @@ export default function MaterialModal({ material, onClose, onSaved }) {
                 type="text"
                 name="ubicacion"
                 className="form-control"
-                placeholder="Ej. 13-B, 5-A, 2-C..."
+                placeholder="Ej. Locker 13-B, LOKER-amarillo, 5-A..."
                 value={formData.ubicacion}
                 onChange={handleChange}
                 style={{ paddingLeft: 34 }}
-                pattern="^\d+-[A-Za-z]$"
-                title="Formato: número-letra (ej. 13-B)"
+                pattern="^[A-Za-z0-9\s\-_]+$"
+                title="Solo letras, números, espacios y guiones"
               />
             </div>
           </div>

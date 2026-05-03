@@ -7,6 +7,7 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',   // necesario para Docker
     port: 5173,
+    allowedHosts: ['mxtjsf225', 'mxtjsf225.tpvaoc.com'],
     // Polling necesario para HMR en Docker sobre Windows/WSL
     // Sin esto, Vite no detecta cambios en archivos desde el contenedor
     watch: {

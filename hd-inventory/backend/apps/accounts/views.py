@@ -34,3 +34,13 @@ class LogoutView(APIView):
             return Response({'detail': 'Sesión cerrada correctamente.'})
         except Exception:
             return Response({'detail': 'Token inválido.'}, status=400)
+
+class UserListView(APIView):
+    """Lista todos los usuarios para iniciar chats."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .models import User
+        users = User.objects.all().exclude(id=request.user.id)
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data)

@@ -21,12 +21,14 @@ ALLOWED_HOSTS = config(
 
 # ─── Aplicaciones ────────────────────────────────────────────
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'channels',
     # Third party
     'rest_framework',
     'rest_framework_simplejwt',
@@ -39,6 +41,7 @@ INSTALLED_APPS = [
     'apps.inventory',
     'apps.analytics',
     'apps.purchases',
+    'apps.chat',
 ]
 
 # ─── Middleware ───────────────────────────────────────────────
@@ -71,6 +74,17 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'core_main_hdinventory.wsgi.application'
+ASGI_APPLICATION = 'core_main_hdinventory.asgi.application'
+
+# ─── Configuración de Channels (Redis) ────────────────────────
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [(config('REDIS_HOST', default='redis'), 6379)],
+        },
+    },
+}
 
 # ─── Base de datos — PostgreSQL ───────────────────────────────
 DATABASES = {
@@ -125,13 +139,19 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
-    'http://localhost:3000',
     'http://mxtjsf225:5173',
     'http://mxtjsf225.tpvaoc.com:5173',
-    'http://mxtjsf225.tpvaoc.com:8000',
+    'http://localhost:3000',
     'http://mxtj225.inventory',
 ]
 CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://mxtjsf225:5173',
+    'http://mxtjsf225.tpvaoc.com:5173',
+]
 
 # ─── Internacionalización ─────────────────────────────────────
 LANGUAGE_CODE = 'es-mx'

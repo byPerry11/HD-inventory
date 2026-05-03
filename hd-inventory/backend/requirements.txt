@@ -21,3 +21,10 @@ gunicorn
 # Utilidades
 Pillow
 openpyxl
+
+# Chat y Tiempo Real
+daphne==4.1.0
+channels==4.1.0
+channels-redis==4.2.1
+cryptography==42.0.5
+uvicorn[standard]==0.29.0

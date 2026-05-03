@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { usePersistentState } from '../../hooks/usePersistentState'
 import api from '../../api/client'
 
 const EMPTY_FORM = {
@@ -10,10 +11,10 @@ const EMPTY_FORM = {
 }
 
 export default function Entradas() {
-  const [form, setForm]         = useState(EMPTY_FORM)
+  const [form, setForm]         = usePersistentState('hd_entr_form', EMPTY_FORM)
   const [materiales, setMateriales] = useState([])
-  const [search, setSearch]     = useState('')
-  const [selected, setSelected] = useState(null)
+  const [search, setSearch]     = usePersistentState('hd_entr_search', '')
+  const [selected, setSelected] = usePersistentState('hd_entr_sel', null)
   const [loading, setLoading]   = useState(false)
   const [success, setSuccess]   = useState(false)
   const [error, setError]       = useState('')

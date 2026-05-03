@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import ChatWidget from '../Chat/ChatWidget'
 import './Layout.css'
@@ -25,6 +25,7 @@ const ROLE_COLOR = {
 export default function Layout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return localStorage.getItem('hd_sidebar_collapsed') === 'true'
@@ -40,6 +41,7 @@ export default function Layout() {
   }
 
   const navItems = NAV_ITEMS.filter(item => item.roles.includes(user?.role))
+  const showChat = location.pathname !== '/despachar'
 
   const renderAvatar = () => {
     if (user?.avatar) {
@@ -138,7 +140,7 @@ export default function Layout() {
       </main>
 
       {/* Chat Widget */}
-      <ChatWidget />
+      {showChat && <ChatWidget />}
     </div>
   )
 }

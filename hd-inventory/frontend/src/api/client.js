@@ -5,10 +5,8 @@
  */
 import axios from 'axios'
 
-const apiBaseEnv = import.meta.env.VITE_API_URL
-const apiBase = (apiBaseEnv && !apiBaseEnv.includes('backend:'))
-  ? `${apiBaseEnv}/api`
-  : '/api'
+const host = window.location.hostname
+const apiBase = `http://${host}:8000/api`
 
 console.log('API Base URL:', apiBase)
 

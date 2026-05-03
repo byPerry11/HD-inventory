@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { usePersistentState } from '../../hooks/usePersistentState'
 import api from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import './Materiales.css'
@@ -11,9 +12,9 @@ export default function Materiales() {
 
   const [materiales, setMateriales] = useState([])
   const [loading, setLoading]       = useState(true)
-  const [search, setSearch]         = useState('')
-  const [estadoFilter, setEstado]   = useState('')
-  const [page, setPage]             = useState(1)
+  const [search, setSearch]         = usePersistentState('hd_mat_search', '')
+  const [estadoFilter, setEstado]   = usePersistentState('hd_mat_estado', '')
+  const [page, setPage]             = usePersistentState('hd_mat_page', 1)
   const [count, setCount]           = useState(0)
   const [modalMaterial, setModalMaterial] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)

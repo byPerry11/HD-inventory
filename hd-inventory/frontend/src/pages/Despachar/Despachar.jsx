@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { usePersistentState } from '../../hooks/usePersistentState'
 import client from '../../api/client'
 import { cleanBadgeID } from '../../utils/formatters'
 import { useToast } from '../../context/ToastContext'
@@ -12,10 +13,10 @@ export default function Despachar() {
 
   const [materials, setMaterials] = useState([])
   const [categories, setCategories] = useState([])
-  const [selectedCategory, setSelectedCategory] = useState('')
-  const [cart, setCart] = useState([])
+  const [selectedCategory, setSelectedCategory] = usePersistentState('hd_desp_cat', '')
+  const [cart, setCart] = usePersistentState('hd_desp_cart', [])
   const [loading, setLoading] = useState(false)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = usePersistentState('hd_desp_search', '')
   const [showVale, setShowVale] = useState(false)
   const searchInputRef = useRef(null)
 
@@ -25,14 +26,7 @@ export default function Despachar() {
   const [secciones, setSecciones] = useState([])
 
   // Formularios con persistencia
-  const [config, setConfig] = useState(() => {
-    const saved = localStorage.getItem('hd_despachar_config')
-    return saved ? JSON.parse(saved) : { area: '', seccion: '', turno: '', empleado_no: '', recibio: '', observaciones: '' }
-  })
-
-  useEffect(() => {
-    localStorage.setItem('hd_despachar_config', JSON.stringify(config))
-  }, [config])
+  const [config, setConfig] = usePersistentState('hd_despachar_config', { area: '', seccion: '', turno: '', empleado_no: '', recibio: '', observaciones: '' }, 'session')
 
   useEffect(() => {
     fetchData()

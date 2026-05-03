@@ -7,7 +7,7 @@ import { useToast } from '../../context/ToastContext'
 export default function Ajustes() {
   const { user, setUser } = useAuth()
   const { theme, toggleTheme, fontSize, setFontSize } = useTheme()
-  const { showToast } = useToast()
+  const notify = useToast()
   
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
@@ -24,9 +24,9 @@ export default function Ajustes() {
     try {
       const { data } = await api.patch('/auth/me/', formData)
       setUser(data)
-      showToast('Perfil actualizado correctamente', 'success')
+      notify.success('Perfil actualizado correctamente')
     } catch (err) {
-      showToast('Error al actualizar perfil', 'error')
+      notify.error('Error al actualizar perfil')
     } finally {
       setLoading(false)
     }
@@ -45,9 +45,9 @@ export default function Ajustes() {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
       setUser(response.data)
-      showToast('Imagen de perfil actualizada', 'success')
+      notify.success('Imagen de perfil actualizada')
     } catch (err) {
-      showToast('Error al subir imagen', 'error')
+      notify.error('Error al subir imagen')
     } finally {
       setLoading(false)
     }
