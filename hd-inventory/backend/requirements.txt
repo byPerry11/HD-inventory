@@ -8,6 +8,7 @@ djangorestframework-simplejwt==5.4.0
 psycopg2-binary
 # CORS
 django-cors-headers==4.7.0
+whitenoise==6.7.0
 
 # Filtros
 django-filter==25.1

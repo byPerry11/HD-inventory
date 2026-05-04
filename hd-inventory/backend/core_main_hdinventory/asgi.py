@@ -9,12 +9,12 @@ django.setup()
 
 # Ahora sí podemos importar channels y nuestras rutas
 from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.auth import AuthMiddlewareStack
+from apps.chat.middleware import JWTAuthMiddleware
 from apps.chat.routing import websocket_urlpatterns
 
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),
-    "websocket": AuthMiddlewareStack(
+    "websocket": JWTAuthMiddleware(
         URLRouter(
             websocket_urlpatterns
         )
