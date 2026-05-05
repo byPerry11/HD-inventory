@@ -20,6 +20,13 @@ export default defineConfig({
         target: 'http://backend:8000',
         changeOrigin: true,
       },
+      // Redirige /ws/** al backend para WebSockets
+      '/ws': {
+        target: 'ws://backend:8000',
+        ws: true,
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/ws/, '/ws'),
+      },
       // Redirige /media/** al backend para servir imágenes de materiales
       '/media': {
         target: 'http://backend:8000',

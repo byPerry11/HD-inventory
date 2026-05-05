@@ -16,13 +16,15 @@ export default function OrdenesCompra() {
     cantidad: 1,
     costo_unitario: 0,
     moneda: 'MXN',
-    vendedor: ''
+    vendedor: '',
+    no_pr: '',
+    es_remision: false
   })
   
-  // Confirmación de recepción
-  const [showConfirmReceived, setShowConfirmReceived] = useState(false)
-  const [itemsToReceive, setItemsToReceive] = useState([])
-  const [pendingChanges, setPendingChanges] = useState(null)
+  // Paso de flujo (Modal de avance)
+  const [showStepModal, setShowStepModal] = useState(false)
+  const [activeStepOrden, setActiveStepOrden] = useState(null)
+  const [poNumberInput, setPoNumberInput] = useState('')
   
   // Sugerencias de número de parte
   const [suggestions, setSuggestions] = useState([])
@@ -31,14 +33,18 @@ export default function OrdenesCompra() {
   const notify = useToast()
 
   const STATUS_COLORS = {
-    'en_proceso':   { bg: 'var(--color-ordenar-bg)', fg: 'var(--color-ordenar)' },
-    'ordenado':     { bg: 'rgba(31, 111, 235, 0.12)', fg: '#58a6ff' },
-    'pr_aprobada':  { bg: 'rgba(210, 153, 34, 0.15)', fg: '#d2991f' },
-    'po_aprobada':  { bg: 'rgba(210, 153, 34, 0.15)', fg: '#d2991f' },
-    'rem_recibido': { bg: 'var(--color-ok-bg)',      fg: 'var(--color-ok)' },
-    'recibido':     { bg: 'var(--color-ok-bg)',      fg: 'var(--color-ok)' },
-    'cancelado':    { bg: 'var(--color-urge-bg)',    fg: 'var(--color-urge)' },
+    'pr_creada':    { bg: 'rgba(255, 255, 255, 0.05)', fg: '#8b949e', label: 'PR Creada' },
+    'pr_aprobada':  { bg: 'rgba(210, 153, 34, 0.15)', fg: '#d2991f', label: 'PR Aprobada' },
+    'po_aprobada':  { bg: 'rgba(139, 148, 158, 0.15)', fg: '#8b949e', label: 'PO Aprobada' },
+    'ordenado':     { bg: 'rgba(31, 111, 235, 0.12)', fg: '#58a6ff', label: 'Ordenado' },
+    'recibido':     { bg: 'rgba(46, 160, 67, 0.15)',  fg: '#3fb950', label: 'Recibido' },
+    'pedido_rem':   { bg: 'rgba(163, 113, 247, 0.15)', fg: '#a371f7', label: 'Pedido REM' },
+    'rem_recibido': { bg: 'rgba(46, 160, 67, 0.15)',  fg: '#3fb950', label: 'REM Recibido' },
+    'cancelado':    { bg: 'rgba(248, 81, 73, 0.15)',   fg: '#f85149', label: 'Cancelado' },
   }
+
+  const FLUJO_ESTANDAR = ['pr_creada', 'pr_aprobada', 'po_aprobada', 'ordenado', 'recibido']
+  const FLUJO_REM      = ['pedido_rem', 'rem_recibido']
 
   useEffect(() => {
     fetchOrdenes()
@@ -48,7 +54,6 @@ export default function OrdenesCompra() {
   const fetchOrdenes = async () => {
     try {
       const { data } = await api.get('/purchases/ordenes/')
-      // DRF devuelve paginación { count, results: [...] } o directo la lista
       setOrdenes(data.results || data)
       setLoading(false)
     } catch (err) {
@@ -59,11 +64,9 @@ export default function OrdenesCompra() {
 
   const toggleEditMode = () => {
     if (isEditing) {
-      // Confirmar descartar cambios si no se ha guardado
       setIsEditing(false)
       setEditValues({})
     } else {
-      // Iniciar edición
       const initialEdits = {}
       ordenes.forEach(o => {
         initialEdits[o.id] = { ...o }
@@ -76,19 +79,13 @@ export default function OrdenesCompra() {
   const handleEditChange = (id, field, value) => {
     setEditValues(prev => ({
       ...prev,
-      [id]: {
-        ...prev[id],
-        [field]: value
-      }
+      [id]: { ...prev[id], [field]: value }
     }))
   }
 
   const handleSaveAll = async () => {
     try {
-      // Filtrar solo los que realmente cambiaron para optimizar
       const cambios = []
-      const aRecibir = []
-
       ordenes.forEach(o => {
         const edits = editValues[o.id]
         if (!edits) return
@@ -96,20 +93,8 @@ export default function OrdenesCompra() {
         let hasChanges = false
         const payload = { id: o.id }
         
-        if (edits.status !== o.status) { 
-          payload.status = edits.status
-          hasChanges = true 
-          // Si está pasando a un estado de recepción
-          if (edits.status === 'recibido' || edits.status === 'rem_recibido') {
-            aRecibir.push({
-              no_parte: o.no_parte,
-              descripcion: o.descripcion,
-              cantidad: o.cantidad,
-              nuevo_status: edits.status === 'recibido' ? 'Recibido' : 'REM recibida'
-            })
-          }
-        }
         if (edits.po_number !== o.po_number) { payload.po_number = edits.po_number; hasChanges = true }
+        if (edits.no_pr !== o.no_pr) { payload.no_pr = edits.no_pr; hasChanges = true }
         if (edits.vendedor !== o.vendedor) { payload.vendedor = edits.vendedor; hasChanges = true }
         if (edits.comentarios !== o.comentarios) { payload.comentarios = edits.comentarios; hasChanges = true }
         if (edits.moneda !== o.moneda) { payload.moneda = edits.moneda; hasChanges = true }
@@ -123,52 +108,74 @@ export default function OrdenesCompra() {
         return
       }
 
-      // Si hay recepciones, pedir confirmación antes de enviar
-      if (aRecibir.length > 0) {
-        setItemsToReceive(aRecibir)
-        setPendingChanges(cambios)
-        setShowConfirmReceived(true)
-        return
-      }
-
-      await executeUpdate(cambios)
+      const { data } = await api.patch('/purchases/ordenes/bulk-update/', cambios)
+      notify.success(`${data.actualizados} registros actualizados`)
+      setIsEditing(false)
+      fetchOrdenes()
     } catch (err) {
-      notify.error('Error al guardar los cambios masivos')
+      notify.error('Error al guardar los cambios')
     }
   }
 
-  const executeUpdate = async (cambios) => {
+  const handleAdvanceStep = async () => {
+    if (!activeStepOrden) return
+    
     try {
-      const { data } = await api.patch('/purchases/ordenes/bulk-update/', cambios)
-      notify.success(`${data.actualizados} órdenes actualizadas`)
-      if (data.errores?.length > 0) {
-        notify.warning('Algunas órdenes tuvieron errores al guardar')
+      const payload = {}
+      if (getNextStatus(activeStepOrden) === 'po_aprobada') {
+        if (!poNumberInput) {
+          notify.warning('El número de PO es requerido')
+          return
+        }
+        payload.po_number = poNumberInput
       }
-      setIsEditing(false)
-      setShowConfirmReceived(false)
+
+      await api.post(`/purchases/ordenes/${activeStepOrden.id}/advance-step/`, payload)
+      notify.success('Estado actualizado correctamente')
+      setShowStepModal(false)
+      setActiveStepOrden(null)
+      setPoNumberInput('')
       fetchOrdenes()
     } catch (err) {
-      notify.error('Error al procesar la actualización')
+      const msg = err.response?.data?.error || 'Error al avanzar de estado'
+      notify.error(msg)
     }
+  }
+
+  const handleCancelOrder = async (id) => {
+    if (!window.confirm('¿Estás seguro de que deseas cancelar esta orden?')) return
+    try {
+      await api.post(`/purchases/ordenes/${id}/cancel/`)
+      notify.success('Orden cancelada')
+      fetchOrdenes()
+    } catch (err) {
+      notify.error(err.response?.data?.error || 'No se pudo cancelar la orden')
+    }
+  }
+
+  const getNextStatus = (orden) => {
+    const flujo = orden.es_remision ? FLUJO_REM : FLUJO_ESTANDAR
+    const idx = flujo.indexOf(orden.status)
+    if (idx !== -1 && idx < flujo.length - 1) {
+      return flujo[idx + 1]
+    }
+    return null
   }
 
   const handleCreateOc = async (e) => {
     e.preventDefault()
     try {
       await api.post('/purchases/ordenes/', newOc)
-      notify.success('Orden de Compra creada exitosamente')
+      notify.success('Orden creada exitosamente')
       setIsCreating(false)
       setNewOc({
-        no_parte: '',
-        descripcion: '',
-        cantidad: 1,
-        costo_unitario: 0,
-        moneda: 'MXN',
-        vendedor: ''
+        no_parte: '', descripcion: '', cantidad: 1, 
+        costo_unitario: 0, moneda: 'MXN', vendedor: '',
+        no_pr: '', es_remision: false
       })
       fetchOrdenes()
     } catch (err) {
-      notify.error('No se pudo crear la Orden de Compra')
+      notify.error('Error al crear la orden')
     }
   }
 
@@ -176,54 +183,36 @@ export default function OrdenesCompra() {
     const val = e.target.value
     setNewOc(prev => ({ ...prev, no_parte: val }))
     if (val.length < 2) {
-      setSuggestions([])
-      setShowSuggestions(false)
-      return
+      setSuggestions([]); setShowSuggestions(false); return
     }
     try {
-      // DRF search para materials
       const { data } = await api.get(`/materials/?search=${val}`)
-      const res = data.results || data
-      setSuggestions(res.slice(0, 5)) // Solo mostrar las mejores 5 coincidencias
+      setSuggestions((data.results || data).slice(0, 5))
       setShowSuggestions(true)
-    } catch (err) {
-      // Fallo silencioso si falla la red en tipeo
-    }
+    } catch (err) {}
   }
 
   const selectSuggestion = async (mat) => {
-    setNewOc(prev => ({
-      ...prev,
-      no_parte: mat.code,
-      descripcion: mat.name
-    }))
+    setNewOc(prev => ({ ...prev, no_parte: mat.code, descripcion: mat.name }))
     setShowSuggestions(false)
-    
-    // Intenta buscar el historial de compras para ese número de parte
     try {
       const { data } = await api.get(`/purchases/ordenes/?search=${mat.code}`)
-      const coincidencias = data.results || data
-      
-      // Filtrar coincidencias exactas y buscar la más reciente
-      const historialExacto = coincidencias.filter(oc => oc.no_parte === mat.code)
-      if (historialExacto.length > 0) {
-        // Asumiendo que vienen por ID u ordenadas por fecha descendente
-        const lastOc = historialExacto[0] 
+      const coincidencias = (data.results || data).filter(oc => oc.no_parte === mat.code)
+      if (coincidencias.length > 0) {
+        const lastOc = coincidencias[0] 
         setNewOc(prev => ({
           ...prev,
           costo_unitario: lastOc.costo_unitario || prev.costo_unitario,
           moneda: lastOc.moneda || prev.moneda,
           vendedor: lastOc.vendedor || prev.vendedor
         }))
-        notify.info('Datos de costo y proveedor recuperados')
+        notify.info('Historial recuperado')
       }
-    } catch (err) {
-      // fallo silencioso
-    }
+    } catch (err) {}
   }
 
   const formatMoney = (amount, currency) => {
-    if (!amount) return '—'
+    if (amount == null) return '—'
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: currency || 'MXN' }).format(amount)
   }
 
@@ -232,7 +221,7 @@ export default function OrdenesCompra() {
       <header className="ordenes-header">
         <div>
           <h1 className="ordenes-title">Control de Órdenes</h1>
-          <p className="ordenes-subtitle">Gestión de compras y recepciones (PO)</p>
+          <p className="ordenes-subtitle">Flujo lineal de adquisiciones y recepciones</p>
         </div>
         <div className="ordenes-actions">
           {isEditing ? (
@@ -240,14 +229,14 @@ export default function OrdenesCompra() {
               <button className="btn btn-secondary" onClick={toggleEditMode}>Cancelar</button>
               <button className="btn btn-primary" onClick={handleSaveAll}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                Guardar Cambios
+                Guardar Datos
               </button>
             </>
           ) : (
             <>
               <button className="btn btn-secondary" onClick={toggleEditMode}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                Editar Tabla
+                Editar Datos
               </button>
               <button className="btn btn-primary" onClick={() => setIsCreating(true)}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -260,38 +249,55 @@ export default function OrdenesCompra() {
 
       <div className="ordenes-table-container">
         {loading ? (
-          <div className="loading-state">Cargando órdenes...</div>
+          <div className="loading-state">Cargando flujo de órdenes...</div>
         ) : (
           <table className="ordenes-table">
             <thead>
               <tr>
-                <th>Fecha Emisión</th>
+                <th>Emisión</th>
+                <th>No. PR</th>
                 <th>No. Parte</th>
                 <th>Descripción</th>
                 <th>Cant.</th>
                 <th>Costo Un.</th>
                 <th>Total</th>
-                <th>Status</th>
-                <th>PO Number</th>
-                <th>Vendedor</th>
-                <th>Entrega Estim.</th>
-                <th>Comentarios</th>
+                <th>Status (Paso)</th>
+                <th>No. PO</th>
+                <th>Proveedor</th>
+                <th>Logística</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {ordenes.map(orden => {
-                const isReceived = orden.status === 'recibido' || orden.status === 'rem_recibido'
-                const isItemEditing = isEditing && editValues[orden.id] && !isReceived
+                const isCerrada = orden.status === 'recibido' || orden.status === 'rem_recibido' || orden.status === 'cancelado'
+                const isItemEditing = isEditing && editValues[orden.id] && !isCerrada
                 const val = isItemEditing ? editValues[orden.id] : orden
+                const nextStep = getNextStatus(orden)
 
                 return (
-                  <tr key={orden.id} className={`orden-row--${orden.status} ${isItemEditing ? 'row-editing' : ''} ${isReceived ? 'row-locked' : ''}`}>
-                    <td className="text-secondary">{orden.fecha_emision}</td>
-                    <td className="fw-500">{orden.no_parte}</td>
-                    <td>{orden.descripcion}</td>
-                    <td className="text-center">{orden.cantidad}</td>
+                  <tr key={orden.id} className={`orden-row--${orden.status} ${isItemEditing ? 'row-editing' : ''} ${isCerrada ? 'row-locked' : ''}`}>
+                    <td className="text-secondary" style={{ whiteSpace: 'nowrap' }}>{orden.fecha_emision}</td>
                     
-                    {/* Costo con moneda */}
+                    {/* No. PR */}
+                    <td>
+                      {isItemEditing ? (
+                        <input
+                          type="text"
+                          className="input-text compact"
+                          value={val.no_pr || ''}
+                          onChange={(e) => handleEditChange(orden.id, 'no_pr', e.target.value)}
+                          placeholder="PR-XXXX"
+                        />
+                      ) : (
+                        <span className="fw-500">{orden.no_pr || (orden.es_remision ? 'REM' : '—')}</span>
+                      )}
+                    </td>
+
+                    <td className="fw-600">{orden.no_parte}</td>
+                    <td><div className="truncate-2" title={orden.descripcion}>{orden.descripcion}</div></td>
+                    <td className="text-center fw-600">{orden.cantidad}</td>
+                    
                     <td>
                       <div className="costo-edit-group">
                         <span className="text-secondary">{formatMoney(orden.costo_unitario, val.moneda)}</span>
@@ -308,38 +314,41 @@ export default function OrdenesCompra() {
                       </div>
                     </td>
 
-                    <td className="fw-500 text-right">{formatMoney(orden.costo_total, val.moneda)}</td>
+                    <td className="fw-600 text-right">{formatMoney(orden.costo_total, val.moneda)}</td>
                     
-                    {/* Status */}
+                    {/* Status con Stepper */}
                     <td>
-                      {isItemEditing ? (
-                        <select
-                          className="input-select"
-                          value={val.status}
-                          onChange={(e) => handleEditChange(orden.id, 'status', e.target.value)}
-                        >
-                          <option value="en_proceso">En Proceso</option>
-                          <option value="ordenado">Ordenado</option>
-                          <option value="pr_aprobada">PR aprobada</option>
-                          <option value="po_aprobada">PO aprobada</option>
-                          <option value="rem_recibido">REM recibida</option>
-                          <option value="recibido">Recibido</option>
-                          <option value="cancelado">Cancelado</option>
-                        </select>
-                      ) : (
-                        <span 
-                          className="status-badge" 
+                      <div className="status-cell">
+                        <button 
+                          className={`status-badge-btn ${!nextStep ? 'is-final' : ''}`}
+                          disabled={!nextStep}
+                          onClick={() => {
+                            setActiveStepOrden(orden)
+                            setShowStepModal(true)
+                          }}
                           style={{ 
                             backgroundColor: STATUS_COLORS[orden.status]?.bg, 
                             color: STATUS_COLORS[orden.status]?.fg 
                           }}
                         >
-                          {orden.status_label}
-                        </span>
-                      )}
+                          {STATUS_COLORS[orden.status]?.label}
+                          {nextStep && <span className="advance-icon">→</span>}
+                        </button>
+                        
+                        <div className="mini-stepper">
+                           {(orden.es_remision ? FLUJO_REM : FLUJO_ESTANDAR).map(s => (
+                             <div 
+                               key={s} 
+                               className={`step-dot ${s === orden.status ? 'is-active' : ''} ${
+                                 (orden.es_remision ? FLUJO_REM : FLUJO_ESTANDAR).indexOf(s) < (orden.es_remision ? FLUJO_REM : FLUJO_ESTANDAR).indexOf(orden.status) ? 'is-done' : ''
+                               }`}
+                             />
+                           ))}
+                        </div>
+                      </div>
                     </td>
 
-                    {/* PO Number */}
+                    {/* No. PO */}
                     <td>
                       {isItemEditing ? (
                         <input
@@ -347,14 +356,13 @@ export default function OrdenesCompra() {
                           className="input-text compact"
                           value={val.po_number || ''}
                           onChange={(e) => handleEditChange(orden.id, 'po_number', e.target.value)}
-                          placeholder="No. PO"
+                          placeholder="PO-XXXX"
                         />
                       ) : (
-                        <span>{orden.po_number || '—'}</span>
+                        <span className="font-mono">{orden.po_number || '—'}</span>
                       )}
                     </td>
 
-                    {/* Vendedor */}
                     <td>
                       {isItemEditing ? (
                         <input
@@ -362,66 +370,86 @@ export default function OrdenesCompra() {
                           className="input-text compact"
                           value={val.vendedor || ''}
                           onChange={(e) => handleEditChange(orden.id, 'vendedor', e.target.value)}
-                          placeholder="Proveedor"
                         />
                       ) : (
-                        <span>{orden.vendedor || '—'}</span>
+                        <span className="truncate">{orden.vendedor || '—'}</span>
                       )}
                     </td>
 
-                    {/* Tiempo de entrega */}
-                    <td className="text-center text-secondary">
-                      {orden.tiempo_entrega_dias != null ? `${orden.tiempo_entrega_dias} días` : '—'}
+                    <td className="text-secondary text-center">
+                       {orden.tiempo_entrega_dias != null ? `${orden.tiempo_entrega_dias}d` : '—'}
                     </td>
 
-                    {/* Comentarios */}
                     <td>
-                      {isItemEditing ? (
-                        <input
-                          type="text"
-                          className="input-text compact"
-                          value={val.comentarios || ''}
-                          onChange={(e) => handleEditChange(orden.id, 'comentarios', e.target.value)}
-                          placeholder="Notas..."
-                        />
-                      ) : (
-                        <span className="truncate" title={orden.comentarios}>{orden.comentarios || '—'}</span>
-                      )}
+                      <div className="row-actions">
+                        {!isCerrada && (
+                          <button 
+                            className="btn-icon text-urge" 
+                            title="Cancelar Orden"
+                            onClick={() => handleCancelOrder(orden.id)}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+                          </button>
+                        )}
+                        {orden.comentarios && (
+                          <div className="comment-indicator" title={orden.comentarios}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
               })}
-              {ordenes.length === 0 && !loading && (
-                <tr>
-                  <td colSpan="11" className="text-center text-secondary py-4">No hay órdenes de compra registradas.</td>
-                </tr>
-              )}
             </tbody>
           </table>
         )}
       </div>
 
-      {/* Modal para Crear Nueva Orden */}
+      {/* Modal: Nueva Orden */}
       {isCreating && (
         <div className="modal-overlay" onClick={() => setIsCreating(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="modal-content modal-content--create" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 className="modal-title">Emitir Nueva Orden de Compra</h2>
+              <h2 className="modal-title">Nueva Requisición / Compra</h2>
               <button className="btn-close" onClick={() => setIsCreating(false)}>&times;</button>
             </div>
-            <form className="modal-form" onSubmit={handleCreateOc}>
+            <form className="modal-form modal-form--scrollable" onSubmit={handleCreateOc}>
+              <div className="form-row">
+                <div className="form-group" style={{ flex: 2 }}>
+                  <label>Tipo de Orden</label>
+                  <div className="checkbox-group">
+                    <label className="checkbox-label">
+                      <input 
+                        type="checkbox" 
+                        checked={newOc.es_remision}
+                        onChange={e => setNewOc({...newOc, es_remision: e.target.checked})}
+                      />
+                      Es Pedido por Remisión (REM)
+                    </label>
+                  </div>
+                </div>
+                {!newOc.es_remision && (
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label>No. PR</label>
+                    <input 
+                      type="text" className="input-text" required
+                      value={newOc.no_pr}
+                      onChange={e => setNewOc({...newOc, no_pr: e.target.value})}
+                      placeholder="PR-000"
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className="form-group" style={{ position: 'relative' }}>
-                <label>Num. de Parte</label>
+                <label>Número de Parte</label>
                 <input 
-                  type="text" 
-                  className="input-text" 
-                  autoFocus
-                  required
+                  type="text" className="input-text" required autoFocus
                   value={newOc.no_parte}
                   onChange={handlePartNumberChange}
-                  onFocus={() => { if(suggestions.length > 0) setShowSuggestions(true) }}
+                  onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                  placeholder="Ej: RES-10K"
                   autoComplete="off"
                 />
                 {showSuggestions && suggestions.length > 0 && (
@@ -429,8 +457,11 @@ export default function OrdenesCompra() {
                     {suggestions.map(mat => (
                       <div 
                         key={mat.id} 
-                        className="suggestion-item"
-                        onClick={() => selectSuggestion(mat)}
+                        className="suggestion-item" 
+                        onMouseDown={(e) => {
+                          e.preventDefault() // Evita que el input pierda el foco antes del evento
+                          selectSuggestion(mat)
+                        }}
                       >
                         <span className="suggestion-code">{mat.code}</span>
                         <span className="suggestion-desc">{mat.name}</span>
@@ -439,25 +470,21 @@ export default function OrdenesCompra() {
                   </div>
                 )}
               </div>
+
               <div className="form-group">
                 <label>Descripción</label>
                 <input 
-                  type="text" 
-                  className="input-text" 
-                  required
+                  type="text" className="input-text" required
                   value={newOc.descripcion}
                   onChange={e => setNewOc({...newOc, descripcion: e.target.value})}
-                  placeholder="Descripción de la pieza"
                 />
               </div>
               
               <div className="form-row">
                 <div className="form-group">
-                  <label>Cantidad (Uzs.)</label>
+                  <label>Cantidad</label>
                   <input 
-                    type="number" 
-                    className="input-text" 
-                    min="1" required
+                    type="number" className="input-text" min="1" required
                     value={newOc.cantidad}
                     onChange={e => setNewOc({...newOc, cantidad: parseInt(e.target.value) || 1})}
                   />
@@ -466,16 +493,12 @@ export default function OrdenesCompra() {
                   <label>Costo Unitario</label>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <input 
-                      type="number" 
-                      className="input-text" 
-                      min="0" step="0.0001" required
-                      value={newOc.costo_unitario}
-                      style={{ flex: 1 }}
+                      type="number" className="input-text" min="0" step="0.0001" required
+                      value={newOc.costo_unitario} style={{ flex: 1 }}
                       onChange={e => setNewOc({...newOc, costo_unitario: parseFloat(e.target.value) || 0})}
                     />
                     <select 
-                      className="input-select"
-                      value={newOc.moneda}
+                      className="input-select" value={newOc.moneda}
                       onChange={e => setNewOc({...newOc, moneda: e.target.value})}
                       style={{ width: '80px' }}
                     >
@@ -487,63 +510,66 @@ export default function OrdenesCompra() {
               </div>
 
               <div className="form-group">
-                <label>Vendedor / Proveedor</label>
+                <label>Proveedor Sugerido</label>
                 <input 
-                  type="text" 
-                  className="input-text" 
+                  type="text" className="input-text" 
                   value={newOc.vendedor}
                   onChange={e => setNewOc({...newOc, vendedor: e.target.value})}
-                  placeholder="Mouser, DigiKey, etc."
                 />
               </div>
 
               <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setIsCreating(false)}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Crear Órden
-                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => setIsCreating(false)}>Cancelar</button>
+                <button type="submit" className="btn btn-primary">Crear Orden</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Modal de Confirmación de Recepción */}
-      {showConfirmReceived && (
-        <div className="modal-overlay" onClick={() => setShowConfirmReceived(false)}>
-          <div className="modal-content modal-content--confirm" onClick={e => e.stopPropagation()}>
+      {/* Modal: Avance de Paso */}
+      {showStepModal && activeStepOrden && (
+        <div className="modal-overlay" onClick={() => setShowStepModal(false)}>
+          <div className="modal-content modal-content--step" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 className="modal-title flex items-center gap-2">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-warning)' }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                Confirmar Recepción de Material
-              </h2>
-              <button className="btn-close" onClick={() => setShowConfirmReceived(false)}>&times;</button>
+              <h2 className="modal-title">Avance de Proceso</h2>
+              <button className="btn-close" onClick={() => setShowStepModal(false)}>&times;</button>
             </div>
             <div className="modal-body p-6">
-              <p className="mb-4">Estás por marcar los siguientes materiales como <strong>recibidos</strong>. Esto sumará las cantidades al inventario actual y la orden dejará de ser editable.</p>
-              
-              <div className="confirm-items-list mb-6">
-                {itemsToReceive.map((item, idx) => (
-                  <div key={idx} className="confirm-item-row">
-                    <span className="confirm-item-label">{item.nuevo_status}:</span>
-                    <span className="font-mono fw-600">{item.no_parte}</span>
-                    <span className="text-secondary">— {item.descripcion}</span>
-                    <span className="confirm-item-qty">x{item.cantidad}</span>
+               <div className="step-transition-visual">
+                  <div className="step-box current">
+                    <span className="step-label">Actual</span>
+                    <span className="step-name">{STATUS_COLORS[activeStepOrden.status]?.label}</span>
                   </div>
-                ))}
-              </div>
-              
-              <p className="text-warning fw-500">¿Deseas proceder con la actualización del inventario?</p>
+                  <div className="step-arrow">→</div>
+                  <div className="step-box next">
+                    <span className="step-label">Siguiente</span>
+                    <span className="step-name">{STATUS_COLORS[getNextStatus(activeStepOrden)]?.label}</span>
+                  </div>
+               </div>
+
+               <p className="mt-4 text-secondary">
+                 ¿Deseas confirmar el avance de esta orden al siguiente paso? 
+                 {getNextStatus(activeStepOrden) === 'recibido' && ' Esta acción sumará el material al inventario.'}
+               </p>
+
+               {getNextStatus(activeStepOrden) === 'po_aprobada' && (
+                 <div className="form-group mt-6">
+                    <label>Ingresa el No. de PO para continuar</label>
+                    <input 
+                      type="text" 
+                      className="input-text" 
+                      placeholder="PO-XXXX"
+                      autoFocus
+                      value={poNumberInput}
+                      onChange={e => setPoNumberInput(e.target.value)}
+                    />
+                 </div>
+               )}
             </div>
-            <div className="modal-actions p-6" style={{ borderTop: '1px solid var(--color-border)', backgroundColor: 'rgba(0,0,0,0.1)' }}>
-              <button className="btn btn-secondary" onClick={() => setShowConfirmReceived(false)}>
-                Cancelar
-              </button>
-              <button className="btn btn-primary" onClick={() => executeUpdate(pendingChanges)}>
-                Confirmar y Recibir
-              </button>
+            <div className="modal-actions p-6">
+              <button className="btn btn-secondary" onClick={() => setShowStepModal(false)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={handleAdvanceStep}>Confirmar Avance</button>
             </div>
           </div>
         </div>

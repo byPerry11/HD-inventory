@@ -9,6 +9,9 @@ class OrdenCompraAdmin(admin.ModelAdmin):
                      'cantidad', 'moneda', 'status', 'po_number', 'vendedor', 'actualizado_en']
     list_filter   = ['status', 'moneda', 'vendedor']
     search_fields = ['no_parte', 'descripcion', 'po_number', 'vendedor']
-    readonly_fields = ['costo_total', 'tiempo_entrega_dias', 'fecha_aprobacion',
-                       'fecha_recibido', 'creado_en', 'actualizado_en']
+    readonly_fields = [
+        'costo_total', 'tiempo_entrega_dias', 
+        'fecha_pr', 'fecha_pr_aprobada', 'fecha_po_aprobada', 'fecha_ordenado', 'fecha_recibido',
+        'creado_en', 'actualizado_en'
+    ]
     date_hierarchy = 'fecha_emision'

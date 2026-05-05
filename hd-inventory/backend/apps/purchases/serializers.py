@@ -33,8 +33,13 @@ class OrdenCompraSerializer(serializers.ModelSerializer):
             'costo_total',
             'status',
             'status_label',
+            'no_pr',
             'po_number',
-            'fecha_aprobacion',
+            'es_remision',
+            'fecha_pr',
+            'fecha_pr_aprobada',
+            'fecha_po_aprobada',
+            'fecha_ordenado',
             'fecha_recibido',
             'tiempo_entrega_dias',
             'vendedor',
@@ -50,7 +55,8 @@ class OrdenCompraSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id', 'costo_total', 'tiempo_entrega_dias',
-            'fecha_aprobacion', 'fecha_recibido',
+            'fecha_pr', 'fecha_pr_aprobada', 'fecha_po_aprobada', 
+            'fecha_ordenado', 'fecha_recibido',
             'creado_en', 'actualizado_en',
             'creado_por', 'actualizado_por',
             'proveedor_nombre',
@@ -68,6 +74,31 @@ class OrdenCompraSerializer(serializers.ModelSerializer):
         if obj.actualizado_por:
             return obj.actualizado_por.get_full_name() or obj.actualizado_por.username
         return None
+
+    def validate(self, data):
+        is_advance = self.context.get('is_advance_step', False)
+
+        # 1. Al crear, establecer status inicial según es_remision
+        if not self.instance:
+            es_rem = data.get('es_remision', False)
+            data['status'] = 'pedido_rem' if es_rem else 'pr_creada'
+        elif not is_advance:
+            # 2. Al editar manualmente, NO permitir cambiar el status
+            if 'status' in data and data['status'] != self.instance.status:
+                raise serializers.ValidationError({
+                    "status": "El estado no puede cambiarse manualmente. Use los pasos de avance."
+                })
+
+        # 3. Validar No. PR requerido SOLO al crear ordenes estándar nuevas
+        if not self.instance:
+            es_remision = data.get('es_remision', False)
+            no_pr = data.get('no_pr', '')
+            if not es_remision and not no_pr:
+                raise serializers.ValidationError({
+                    "no_pr": "El No. PR es requerido para órdenes estándar."
+                })
+
+        return data
 
 
 class OrdenCompraListSerializer(serializers.ModelSerializer):
@@ -90,8 +121,11 @@ class OrdenCompraListSerializer(serializers.ModelSerializer):
             'costo_total',
             'status',
             'status_label',
+            'no_pr',
             'po_number',
-            'fecha_aprobacion',
+            'es_remision',
+            'fecha_pr',
+            'fecha_po_aprobada',
             'fecha_recibido',
             'tiempo_entrega_dias',
             'vendedor',

@@ -262,13 +262,13 @@ class SugerenciasCompraView(APIView):
         # 2. Tiempos de entrega promedios
         ocs = OrdenCompra.objects.filter(
             status='recibido',
-            fecha_aprobacion__isnull=False,
+            fecha_po_aprobada__isnull=False,
             fecha_recibido__isnull=False
         )
         lead_time_por_mat = {}
         for oc in ocs:
             if not oc.material_id: continue
-            dias_entrega = max(1, (oc.fecha_recibido - oc.fecha_aprobacion).days)
+            dias_entrega = oc.tiempo_entrega_dias or 14
             if oc.material_id not in lead_time_por_mat:
                 lead_time_por_mat[oc.material_id] = []
             lead_time_por_mat[oc.material_id].append(dias_entrega)

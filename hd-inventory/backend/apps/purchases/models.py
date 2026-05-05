@@ -38,13 +38,19 @@ class Proveedor(models.Model):
 
 class OrdenCompra(models.Model):
 
+    FLUJO_ESTANDAR  = ['pr_creada', 'pr_aprobada', 'po_aprobada', 'ordenado', 'recibido']
+    FLUJO_REM       = ['pedido_rem', 'rem_recibido']
+    ESTADOS_CERRADO = {'recibido', 'rem_recibido'}
+    ESTADOS_CANCELABLE = {'pr_creada', 'pr_aprobada', 'po_aprobada', 'pedido_rem'}
+
     STATUS_CHOICES = [
-        ('en_proceso',   'En Proceso'),
+        ('pr_creada',    'PR Creada'),
+        ('pr_aprobada',  'PR Aprobada'),
+        ('po_aprobada',  'PO Aprobada'),
         ('ordenado',     'Ordenado'),
-        ('pr_aprobada',  'PR aprobada'),
-        ('po_aprobada',  'PO aprobada'),
-        ('rem_recibido', 'REM recibida'),
         ('recibido',     'Recibido'),
+        ('pedido_rem',   'Pedido REM'),
+        ('rem_recibido', 'REM Recibido'),
         ('cancelado',    'Cancelado'),
     ]
 
@@ -83,28 +89,36 @@ class OrdenCompra(models.Model):
         verbose_name='Moneda',
     )
 
-    # ─── Estado / PO ─────────────────────────────────────────
+    # ─── Estado / PO / PR ────────────────────────────────────
     status          = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
-        default='ordenado',
+        default='pr_creada',
         db_index=True,
         verbose_name='Estado',
+    )
+    no_pr           = models.CharField(
+        max_length=100, blank=True,
+        verbose_name='No. PR',
+        help_text='Requerido para flujo estándar.'
     )
     po_number       = models.CharField(
         max_length=100, blank=True,
         verbose_name='No. PO',
-        help_text='Al registrar este número se guarda automáticamente la fecha de aprobación.',
+        help_text='Se captura al avanzar a PO Aprobada.',
     )
-    fecha_aprobacion = models.DateField(
-        null=True, blank=True,
-        verbose_name='Fecha Aprobación',
-    )
-    fecha_recibido  = models.DateField(
-        null=True, blank=True,
-        verbose_name='Fecha Recibido',
+    es_remision     = models.BooleanField(
+        default=False,
+        verbose_name='Pedido por Remisión'
     )
 
+    # ─── Fechas de Auditoría por Paso ────────────────────────
+    fecha_pr           = models.DateTimeField(null=True, blank=True, verbose_name='Fecha PR / Pedido REM')
+    fecha_pr_aprobada  = models.DateTimeField(null=True, blank=True, verbose_name='Fecha PR Aprobada')
+    fecha_po_aprobada  = models.DateTimeField(null=True, blank=True, verbose_name='Fecha PO Aprobada')
+    fecha_ordenado     = models.DateTimeField(null=True, blank=True, verbose_name='Fecha Ordenado')
+    fecha_recibido     = models.DateField(null=True, blank=True, verbose_name='Fecha Recibido')
+    
     # ─── Proveedor / Logística ────────────────────────────────
     vendedor        = models.CharField(max_length=200, blank=True, verbose_name='Vendedor (Texto)')
     proveedor_ref   = models.ForeignKey(
@@ -136,7 +150,6 @@ class OrdenCompra(models.Model):
     actualizado_en  = models.DateTimeField(auto_now=True)
 
     # ─── Atributo transient (no se persiste) ──────────────────
-    # El ViewSet lo lee para incluir una advertencia en la respuesta.
     _material_creado_inactivo: bool = False
 
     class Meta:
@@ -158,33 +171,48 @@ class OrdenCompra(models.Model):
     @property
     def tiempo_entrega_dias(self):
         """Días transcurridos desde PO aprobada hasta recibido."""
-        if self.fecha_aprobacion and self.fecha_recibido:
-            return (self.fecha_recibido - self.fecha_aprobacion).days
+        if self.fecha_po_aprobada and self.fecha_recibido:
+            # fecha_po_aprobada es DateTime, fecha_recibido es Date
+            return (self.fecha_recibido - self.fecha_po_aprobada.date()).days
         return None
 
     # ─── Rastreo de cambios ───────────────────────────────────
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.__old_status     = self.status
-        self.__old_po_number  = self.po_number
+        self.__old_status = self.status
 
     # ─── Lógica de negocio ────────────────────────────────────
 
+    @staticmethod
+    def get_siguiente_status(status_actual, es_remision=False):
+        flujo = OrdenCompra.FLUJO_REM if es_remision else OrdenCompra.FLUJO_ESTANDAR
+        try:
+            idx = flujo.index(status_actual)
+            if idx + 1 < len(flujo):
+                return flujo[idx + 1]
+        except ValueError:
+            pass
+        return None
+
     def save(self, *args, **kwargs):
-        today = timezone.now().date()
+        now = timezone.now()
+        today = now.date()
 
-        # Auto-fecha de aprobación al registrar PO number O al cambiar a estados de aprobación
-        es_aprobado = self.status in ('pr_aprobada', 'po_aprobada')
-        fue_aprobado = self.__old_status in ('pr_aprobada', 'po_aprobada')
-        
-        if (self.po_number and not self.__old_po_number) or (es_aprobado and not fue_aprobado):
-            if not self.fecha_aprobacion:
-                self.fecha_aprobacion = today
+        # Si es nueva, o cambió el status, capturamos fechas
+        is_new = self.pk is None
+        status_changed = is_new or (self.status != self.__old_status)
 
-        # Auto-fecha de recibido al cambiar status a 'recibido' o 'rem_recibido'
-        if self.status in ('recibido', 'rem_recibido') and self.__old_status not in ('recibido', 'rem_recibido'):
-            if not self.fecha_recibido:
+        if status_changed:
+            if self.status in ('pr_creada', 'pedido_rem') and not self.fecha_pr:
+                self.fecha_pr = now
+            elif self.status == 'pr_aprobada' and not self.fecha_pr_aprobada:
+                self.fecha_pr_aprobada = now
+            elif self.status == 'po_aprobada' and not self.fecha_po_aprobada:
+                self.fecha_po_aprobada = now
+            elif self.status == 'ordenado' and not self.fecha_ordenado:
+                self.fecha_ordenado = now
+            elif self.status in ('recibido', 'rem_recibido') and not self.fecha_recibido:
                 self.fecha_recibido = today
 
         super().save(*args, **kwargs)
@@ -193,9 +221,7 @@ class OrdenCompra(models.Model):
         if self.status in ('recibido', 'rem_recibido') and self.__old_status not in ('recibido', 'rem_recibido'):
             self._material_creado_inactivo = self._actualizar_stock()
 
-        # Actualizar los valores "viejos" para próximos saves
-        self.__old_status    = self.status
-        self.__old_po_number = self.po_number
+        self.__old_status = self.status
 
     def _actualizar_stock(self) -> bool:
         """

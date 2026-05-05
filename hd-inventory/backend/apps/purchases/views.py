@@ -29,8 +29,8 @@ class OrdenCompraViewSet(viewsets.ModelViewSet):
     permission_classes = [IsSupervisorOrAbove]
     queryset           = OrdenCompra.objects.select_related('material', 'creado_por', 'actualizado_por', 'proveedor_ref')
     filter_backends    = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields   = ['status', 'moneda', 'vendedor', 'proveedor_ref']
-    search_fields      = ['no_parte', 'descripcion', 'po_number', 'vendedor']
+    filterset_fields   = ['status', 'moneda', 'vendedor', 'proveedor_ref', 'es_remision']
+    search_fields      = ['no_parte', 'descripcion', 'po_number', 'vendedor', 'no_pr']
     ordering_fields    = ['fecha_emision', 'status', 'costo_unitario', 'actualizado_en']
     ordering           = ['-fecha_emision']
 
@@ -106,3 +106,72 @@ class OrdenCompraViewSet(viewsets.ModelViewSet):
             'actualizados': actualizados,
             'errores':      errores,
         }, status=status.HTTP_200_OK if not errores else status.HTTP_207_MULTI_STATUS)
+
+    @action(detail=True, methods=['post'], url_path='advance-step')
+    def advance_step(self, request, pk=None):
+        """
+        Avanza la orden al siguiente paso lógico.
+        Si el siguiente paso es 'po_aprobada', requiere 'po_number'.
+        """
+        instance = self.get_object()
+        
+        if instance.status in OrdenCompra.ESTADOS_CERRADO:
+            return Response(
+                {"error": "La orden ya está en un estado final y no puede avanzar."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        next_status = OrdenCompra.get_siguiente_status(instance.status, instance.es_remision)
+        
+        if not next_status:
+            return Response(
+                {"error": "No hay un siguiente paso definido para esta orden."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validación especial para PO Aprobada
+        data = {'status': next_status}
+        if next_status == 'po_aprobada':
+            po_number = request.data.get('po_number')
+            if not po_number:
+                return Response(
+                    {"error": "El No. PO es requerido para aprobar la orden."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            data['po_number'] = po_number
+
+        serializer = self.get_serializer(
+            instance, data=data, partial=True,
+            context={**self.get_serializer_context(), 'is_advance_step': True}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save(actualizado_por=request.user)
+
+        # Refrescar para advertencias de stock
+        instance.refresh_from_db()
+        resp_data = serializer.data
+        if getattr(instance, '_material_creado_inactivo', False):
+            resp_data['warnings'] = [{
+                'code': 'material_creado_inactivo',
+                'message': f'Material "{instance.no_parte}" creado como inactivo.'
+            }]
+
+        return Response(resp_data)
+
+    @action(detail=True, methods=['post'], url_path='cancel')
+    def cancel_order(self, request, pk=None):
+        """Cancela la orden si está en un estado permitido."""
+        instance = self.get_object()
+        
+        if instance.status not in OrdenCompra.ESTADOS_CANCELABLE:
+            return Response(
+                {"error": f"No se puede cancelar una orden en estado {instance.get_status_display()}."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        instance.status = 'cancelado'
+        instance.actualizado_por = request.user
+        instance.save()
+        
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
