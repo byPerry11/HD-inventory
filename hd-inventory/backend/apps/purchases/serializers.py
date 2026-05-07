@@ -106,6 +106,7 @@ class OrdenCompraListSerializer(serializers.ModelSerializer):
     costo_total         = serializers.ReadOnlyField()
     tiempo_entrega_dias = serializers.ReadOnlyField()
     status_label        = serializers.SerializerMethodField()
+    creado_por_nombre   = serializers.SerializerMethodField()
     proveedor_nombre    = serializers.ReadOnlyField(source='proveedor_ref.nombre')
 
     class Meta:
@@ -125,15 +126,24 @@ class OrdenCompraListSerializer(serializers.ModelSerializer):
             'po_number',
             'es_remision',
             'fecha_pr',
+            'fecha_pr_aprobada',
             'fecha_po_aprobada',
+            'fecha_ordenado',
             'fecha_recibido',
+            'recibido_por',
             'tiempo_entrega_dias',
             'vendedor',
             'proveedor_ref',
             'proveedor_nombre',
             'comentarios',
+            'creado_por_nombre',
             'actualizado_en',
         ]
 
     def get_status_label(self, obj):
         return obj.get_status_display()
+
+    def get_creado_por_nombre(self, obj):
+        if obj.creado_por:
+            return obj.creado_por.get_full_name() or obj.creado_por.username
+        return None

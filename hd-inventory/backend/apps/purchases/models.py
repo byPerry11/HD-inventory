@@ -117,7 +117,12 @@ class OrdenCompra(models.Model):
     fecha_pr_aprobada  = models.DateTimeField(null=True, blank=True, verbose_name='Fecha PR Aprobada')
     fecha_po_aprobada  = models.DateTimeField(null=True, blank=True, verbose_name='Fecha PO Aprobada')
     fecha_ordenado     = models.DateTimeField(null=True, blank=True, verbose_name='Fecha Ordenado')
-    fecha_recibido     = models.DateField(null=True, blank=True, verbose_name='Fecha Recibido')
+    fecha_recibido     = models.DateTimeField(null=True, blank=True, verbose_name='Fecha Recibido')
+    recibido_por       = models.CharField(
+        max_length=200, blank=True,
+        verbose_name='Recibido por',
+        help_text='Nombre de la persona que recibió el material.'
+    )
     
     # ─── Proveedor / Logística ────────────────────────────────
     vendedor        = models.CharField(max_length=200, blank=True, verbose_name='Vendedor (Texto)')
@@ -213,7 +218,7 @@ class OrdenCompra(models.Model):
             elif self.status == 'ordenado' and not self.fecha_ordenado:
                 self.fecha_ordenado = now
             elif self.status in ('recibido', 'rem_recibido') and not self.fecha_recibido:
-                self.fecha_recibido = today
+                self.fecha_recibido = now
 
         super().save(*args, **kwargs)
 

@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 
-from apps.accounts.permissions import IsSupervisorOrAbove
+from apps.accounts.permissions import IsSupervisorOrAbove, IsSupervisorOrAboveOrReadOnly
 from .models import OrdenCompra, Proveedor
 from .serializers import OrdenCompraSerializer, OrdenCompraListSerializer, ProveedorSerializer
 
@@ -26,7 +26,7 @@ class OrdenCompraViewSet(viewsets.ModelViewSet):
     CRUD completo de Órdenes de Compra.
     Acceso: Supervisor y Manager.
     """
-    permission_classes = [IsSupervisorOrAbove]
+    permission_classes = [IsSupervisorOrAboveOrReadOnly]
     queryset           = OrdenCompra.objects.select_related('material', 'creado_por', 'actualizado_por', 'proveedor_ref')
     filter_backends    = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields   = ['status', 'moneda', 'vendedor', 'proveedor_ref', 'es_remision']
@@ -139,6 +139,16 @@ class OrdenCompraViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             data['po_number'] = po_number
+            
+        # Validación especial para Recibido
+        if next_status in ('recibido', 'rem_recibido'):
+            recibido_por = request.data.get('recibido_por')
+            if not recibido_por:
+                return Response(
+                    {"error": "El nombre de quien recibe es requerido para completar este paso."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            data['recibido_por'] = recibido_por
 
         serializer = self.get_serializer(
             instance, data=data, partial=True,
