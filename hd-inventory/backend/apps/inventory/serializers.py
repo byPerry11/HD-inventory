@@ -1,7 +1,7 @@
 """inventory/serializers.py"""
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import Entrada, Salida, Seccion, Area, TURNO_CHOICES, Vale, Empleado
+from .models import Entrada, Salida, Area, Linea, TURNO_CHOICES, Vale, Empleado
 from apps.materials.serializers import MaterialListSerializer
 
 User = get_user_model()
@@ -13,16 +13,18 @@ class EmpleadoSerializer(serializers.ModelSerializer):
         fields = ['id', 'numero', 'nombre']
 
 
+class LineaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Linea
+        fields = ['id', 'nombre']
+
+
 class AreaSerializer(serializers.ModelSerializer):
+    linea_nombre = serializers.ReadOnlyField(source='linea.nombre')
+
     class Meta:
         model = Area
-        fields = ['id', 'nombre']
-
-
-class SeccionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Seccion
-        fields = ['id', 'nombre']
+        fields = ['id', 'nombre', 'linea', 'linea_nombre']
 
 
 class EntradaSerializer(serializers.ModelSerializer):
@@ -55,8 +57,8 @@ class SalidaSerializer(serializers.ModelSerializer):
     """Serializer de Salida de material."""
     material_info = MaterialListSerializer(source='material', read_only=True)
     registrado_por_nombre = serializers.SerializerMethodField()
+    linea_nombre = serializers.ReadOnlyField(source='linea.nombre')
     area_nombre = serializers.ReadOnlyField(source='area.nombre')
-    seccion_nombre = serializers.ReadOnlyField(source='seccion.nombre')
     turno_choices = serializers.SerializerMethodField()
 
     class Meta:
@@ -64,8 +66,8 @@ class SalidaSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'material', 'material_info',
             'cantidad', 'fecha',
+            'linea', 'linea_nombre',
             'area', 'area_nombre',
-            'seccion', 'seccion_nombre',
             'turno', 'empleado_no', 'recibio', 'observaciones',
             'registrado_por', 'registrado_por_nombre',
             'turno_choices',
@@ -73,7 +75,7 @@ class SalidaSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'fecha', 'registrado_por',
             'material_info', 'registrado_por_nombre',
-            'area_nombre', 'seccion_nombre',
+            'linea_nombre', 'area_nombre',
             'turno_choices',
         ]
 
@@ -120,23 +122,24 @@ class ValeSerializer(serializers.ModelSerializer):
     """Serializer para Vales"""
     material_info = MaterialListSerializer(source='material', read_only=True)
     registrado_por_nombre = serializers.SerializerMethodField()
+    linea_nombre = serializers.ReadOnlyField(source='linea.nombre')
     area_nombre = serializers.ReadOnlyField(source='area.nombre')
-    seccion_nombre = serializers.ReadOnlyField(source='seccion.nombre')
 
     class Meta:
         model = Vale
         fields = [
             'id', 'empleado_no', 'empleado_nombre', 'recibo_no', 
-            'area', 'area_nombre',
-            'seccion', 'seccion_nombre', 'salida',
+            'linea', 'linea_nombre',
+            'area', 'area_nombre', 'salida',
             'fecha', 'material', 'material_info', 'aut', 'cantidad', 'costo', 'observaciones',
             'registrado_por', 'registrado_por_nombre',
         ]
         read_only_fields = [
             'id', 'fecha', 'registrado_por', 'material_info', 
             'registrado_por_nombre', 'recibo_no',
-            'area_nombre', 'seccion_nombre',
+            'linea_nombre', 'area_nombre',
         ]
+
 
     def get_registrado_por_nombre(self, obj):
         if obj.registrado_por:

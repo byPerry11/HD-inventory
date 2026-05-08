@@ -1,6 +1,6 @@
 """inventory/admin.py"""
 from django.contrib import admin
-from .models import Entrada, Salida, Seccion, Area, Vale, Empleado
+from .models import Entrada, Salida, Area, Linea, Vale, Empleado
 
 
 @admin.register(Entrada)
@@ -20,35 +20,36 @@ class EntradaAdmin(admin.ModelAdmin):
 class SalidaAdmin(admin.ModelAdmin):
     list_display = (
         'id', 'material', 'cantidad',
-        'area', 'seccion', 'turno',
+        'linea', 'area', 'turno',
         'recibio', 'registrado_por', 'fecha',
     )
-    list_filter = ('area', 'turno', 'fecha', 'material__category')
+    list_filter = ('linea', 'turno', 'fecha', 'material__category')
     search_fields = (
         'material__code', 'material__name',
-        'recibio', 'area__nombre', 'seccion__nombre',
+        'recibio', 'linea__nombre', 'area__nombre',
     )
     ordering = ('-fecha',)
     readonly_fields = ('fecha', 'registrado_por')
     date_hierarchy = 'fecha'
 
 
-@admin.register(Seccion)
-class SeccionAdmin(admin.ModelAdmin):
+@admin.register(Linea)
+class LineaAdmin(admin.ModelAdmin):
     list_display = ('id', 'nombre')
     search_fields = ('nombre',)
 
 
 @admin.register(Area)
 class AreaAdmin(admin.ModelAdmin):
-    list_display = ('id', 'nombre')
-    search_fields = ('nombre',)
+    list_display = ('id', 'nombre', 'linea')
+    list_filter = ('linea',)
+    search_fields = ('nombre', 'linea__nombre')
 
 
 @admin.register(Vale)
 class ValeAdmin(admin.ModelAdmin):
-    list_display = ('recibo_no', 'empleado_nombre', 'area', 'seccion', 'material', 'cantidad', 'fecha')
-    list_filter = ('area', 'fecha')
+    list_display = ('recibo_no', 'empleado_nombre', 'linea', 'area', 'material', 'cantidad', 'fecha')
+    list_filter = ('linea', 'fecha')
     search_fields = ('empleado_no', 'empleado_nombre', 'recibo_no', 'material__code')
     readonly_fields = ('fecha', 'registrado_por', 'recibo_no')
 

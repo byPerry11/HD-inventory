@@ -69,7 +69,7 @@ class ConsumoPorLineaView(APIView):
         consumo = (
             Salida.objects
             .filter(fecha__gte=desde)
-            .values(linea=F('area__nombre'))
+            .values(linea_nombre=F('linea__nombre'))
             .annotate(
                 total_movimientos=Count('id'),
                 total_unidades=Sum('cantidad'),
@@ -114,7 +114,7 @@ class TopSalidasView(APIView):
 
 class AlertasView(APIView):
     """
-    Materiales en estado 'ordenar' o 'urge'.
+    Materiales en estado 'ordenar' or 'urge'.
     Acceso: Supervisor y Manager.
     """
     permission_classes = [IsSupervisorOrAbove]
@@ -176,12 +176,12 @@ class MovimientosRecientesView(APIView):
         )
         salidas = (
             Salida.objects
-            .select_related('material', 'registrado_por')
+            .select_related('material', 'registrado_por', 'linea', 'area')
             .order_by('-fecha')[:10]
         )
         vales = (
             Vale.objects
-            .select_related('material', 'registrado_por', 'area', 'seccion')
+            .select_related('material', 'registrado_por', 'linea', 'area')
             .order_by('-fecha')[:10]
         )
 
@@ -205,8 +205,8 @@ class MovimientosRecientesView(APIView):
                 'material_name': s.material.name,
                 'cantidad': s.cantidad,
                 'fecha': s.fecha,
-                'area': s.area.nombre if s.area else s.linea_legacy,
-                'seccion': s.seccion.nombre if s.seccion else s.seccion_legacy,
+                'linea': s.linea.nombre if s.linea else s.linea_legacy,
+                'area': s.area.nombre if s.area else s.seccion_legacy,
                 'turno': s.turno,
                 'recibio': s.recibio,
                 'empleado_no': s.empleado_no,
@@ -223,8 +223,8 @@ class MovimientosRecientesView(APIView):
                 'material_name': v.material.name,
                 'cantidad': v.cantidad,
                 'fecha': v.fecha,
-                'area': v.area.nombre if v.area else '',
-                'seccion': v.seccion.nombre if v.seccion else v.seccion_legacy,
+                'linea': v.linea.nombre if v.linea else '',
+                'area': v.area.nombre if v.area else v.seccion_legacy,
                 'recibio': v.empleado_nombre,
                 'empleado_no': v.empleado_no,
                 'observaciones': v.observaciones,
@@ -236,6 +236,7 @@ class MovimientosRecientesView(APIView):
             'salidas': [fmt_salida(s) for s in salidas],
             'vales': [fmt_vale(v) for v in vales],
         })
+
 
 
 class SugerenciasCompraView(APIView):

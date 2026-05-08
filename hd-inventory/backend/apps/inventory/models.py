@@ -32,15 +32,15 @@ LINEA_CHOICES = [
     ('OQA', 'OQA'),
 ]
 
-class Seccion(models.Model):
+class Linea(models.Model):
     """
-    Catálogo de secciones para las salidas, administrable por supervisores/managers.
+    Catálogo de líneas (anteriormente áreas) administrable.
     """
-    nombre = models.CharField(max_length=100, unique=True, verbose_name="Nombre de la Sección")
+    nombre = models.CharField(max_length=100, unique=True, verbose_name="Nombre de la Línea")
 
     class Meta:
-        verbose_name = 'Sección'
-        verbose_name_plural = 'Secciones'
+        verbose_name = 'Línea'
+        verbose_name_plural = 'Líneas'
         ordering = ['nombre']
 
     def __str__(self):
@@ -49,17 +49,29 @@ class Seccion(models.Model):
 
 class Area(models.Model):
     """
-    Catálogo de áreas (anteriormente líneas) administrable.
+    Catálogo de áreas (anteriormente secciones) administrable por supervisores/managers.
+    Cada área pertenece a una línea.
     """
-    nombre = models.CharField(max_length=100, unique=True, verbose_name="Nombre del Área")
+    nombre = models.CharField(max_length=100, verbose_name="Nombre del Área")
+    linea = models.ForeignKey(
+        Linea,
+        on_delete=models.CASCADE,
+        related_name='areas',
+        verbose_name='Línea',
+        null=True,
+        blank=True
+    )
 
     class Meta:
         verbose_name = 'Área'
         verbose_name_plural = 'Áreas'
-        ordering = ['nombre']
+        ordering = ['linea', 'nombre']
+        unique_together = ('nombre', 'linea')
 
     def __str__(self):
-        return self.nombre
+        return f"{self.linea.nombre} - {self.nombre}"
+
+
 class Entrada(models.Model):
     """
     Registro de entrada de material al almacén.
@@ -124,6 +136,14 @@ class Salida(models.Model):
     )
     
     # Nuevas llaves foráneas
+    linea = models.ForeignKey(
+        Linea,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='salidas',
+        verbose_name='Línea'
+    )
     area = models.ForeignKey(
         Area,
         on_delete=models.SET_NULL,
@@ -131,14 +151,6 @@ class Salida(models.Model):
         blank=True,
         related_name='salidas',
         verbose_name='Área'
-    )
-    seccion = models.ForeignKey(
-        Seccion,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='salidas',
-        verbose_name='Sección'
     )
     turno = models.CharField(
         max_length=20,
@@ -189,6 +201,14 @@ class Vale(models.Model):
         blank=True, 
         verbose_name='Sección (Legacy)'
     )
+    linea = models.ForeignKey(
+        Linea,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='vales',
+        verbose_name='Línea'
+    )
     area = models.ForeignKey(
         Area,
         on_delete=models.SET_NULL,
@@ -196,14 +216,6 @@ class Vale(models.Model):
         blank=True,
         related_name='vales',
         verbose_name='Área'
-    )
-    seccion = models.ForeignKey(
-        Seccion,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='vales',
-        verbose_name='Sección'
     )
     fecha = models.DateTimeField(auto_now_add=True, verbose_name='Fecha')
 
@@ -241,6 +253,7 @@ class Vale(models.Model):
             last = Vale.objects.order_by('-recibo_no').first()
             self.recibo_no = (last.recibo_no if last and last.recibo_no else 0) + 1
         return super().save(*args, **kwargs)
+
 
 
 class Empleado(models.Model):
