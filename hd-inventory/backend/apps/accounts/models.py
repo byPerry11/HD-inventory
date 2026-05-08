@@ -31,6 +31,11 @@ class User(AbstractUser):
         verbose_name='Imagen de perfil'
     )
 
+    must_change_password = models.BooleanField(
+        default=True,
+        verbose_name='Debe cambiar contraseña'
+    )
+
     class Meta:
         verbose_name = 'Usuario'
         verbose_name_plural = 'Usuarios'

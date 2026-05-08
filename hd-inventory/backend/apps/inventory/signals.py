@@ -15,6 +15,7 @@ def actualizar_stock_entrada(sender, instance, created, **kwargs):
             material = instance.material
             material.stock_actual = F('stock_actual') + instance.cantidad
             material.save(update_fields=['stock_actual', 'actualizado_en'])
+            material.refresh_from_db(fields=['stock_actual'])
 
 
 @receiver(post_save, sender='inventory.Salida')
@@ -25,6 +26,7 @@ def actualizar_stock_salida(sender, instance, created, **kwargs):
             material = instance.material
             material.stock_actual = F('stock_actual') - instance.cantidad
             material.save(update_fields=['stock_actual', 'actualizado_en'])
+            material.refresh_from_db(fields=['stock_actual'])
 
 
 @receiver(post_save, sender='inventory.Vale')
@@ -38,3 +40,4 @@ def actualizar_stock_vale(sender, instance, created, **kwargs):
             material = instance.material
             material.stock_actual = F('stock_actual') - instance.cantidad
             material.save(update_fields=['stock_actual', 'actualizado_en'])
+            material.refresh_from_db(fields=['stock_actual'])

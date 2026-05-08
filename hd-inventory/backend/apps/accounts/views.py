@@ -44,3 +44,23 @@ class UserListView(APIView):
         users = User.objects.all().exclude(id=request.user.id)
         serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
+
+class ChangePasswordView(APIView):
+    """Permite al usuario autenticado cambiar su contraseña."""
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        user = request.user
+        new_password = request.data.get('new_password')
+        
+        if not new_password:
+            return Response({'detail': 'Debe proporcionar una nueva contraseña.'}, status=400)
+            
+        if len(new_password) < 8:
+            return Response({'detail': 'La contraseña debe tener al menos 8 caracteres.'}, status=400)
+
+        user.set_password(new_password)
+        user.must_change_password = False
+        user.save()
+
+        return Response({'detail': 'Contraseña actualizada exitosamente.'})

@@ -14,8 +14,9 @@ class UserSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'first_name', 'last_name',
             'email', 'role', 'role_display', 'is_active', 'avatar',
+            'must_change_password',
         ]
-        read_only_fields = ['id', 'role', 'is_active']
+        read_only_fields = ['id', 'role', 'is_active', 'must_change_password']
 
     def get_role_display(self, obj):
         return obj.get_role_display()
