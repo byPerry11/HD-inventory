@@ -1,10 +1,98 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts'
 import api from '../../api/client'
 import './Dashboard.css'
+
+/* ─── SVG Icons (inline, consistentes con Layout.jsx) ────────── */
+const IconBarChart = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+)
+const IconAlertTriangle = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+)
+const IconTrendingUp = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+)
+const IconActivity = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+)
+const IconPieChart = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+)
+const IconAward = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+)
+const IconFileText = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+)
+const IconChevronLeft = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+)
+const IconChevronRight = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+)
+
+/* ─── Gallery Scroll Component ───────────────────────────────── */
+function AlertaGallery({ items, type }) {
+  const scrollRef = useRef(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  const checkScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 4)
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4)
+  }
+
+  useEffect(() => {
+    checkScroll()
+    const el = scrollRef.current
+    if (el) el.addEventListener('scroll', checkScroll, { passive: true })
+    return () => el?.removeEventListener('scroll', checkScroll)
+  }, [items])
+
+  const scroll = (dir) => {
+    scrollRef.current?.scrollBy({ left: dir * 220, behavior: 'smooth' })
+  }
+
+  return (
+    <div className="alertas-gallery-wrapper">
+      {canScrollLeft && (
+        <button className="alertas-gallery-nav alertas-gallery-nav--left" onClick={() => scroll(-1)} aria-label="Scroll izquierda">
+          <IconChevronLeft />
+        </button>
+      )}
+      <div className="alertas-gallery" ref={scrollRef}>
+        {items.map(m => (
+          <div key={m.id} className={`alerta-card alerta-card--${type}`}>
+            <div className="alerta-header">
+              <div className="alerta-code font-mono">{m.code}</div>
+              {m.active_order && (
+                <div className={`alerta-order-badge alerta-order-badge--${m.active_order.status}`}>
+                  {m.active_order.label}
+                </div>
+              )}
+            </div>
+            <div className="alerta-name">{m.name}</div>
+            <div className="alerta-stock">
+              <span className="alerta-stock-num">{m.stock_actual}</span>
+              <span className="alerta-stock-unit">{m.unit}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      {canScrollRight && (
+        <button className="alertas-gallery-nav alertas-gallery-nav--right" onClick={() => scroll(1)} aria-label="Scroll derecha">
+          <IconChevronRight />
+        </button>
+      )}
+    </div>
+  )
+}
 
 export default function Dashboard() {
   const [resumen, setResumen]         = useState(null)
@@ -55,7 +143,7 @@ export default function Dashboard() {
   return (
     <div className="dashboard">
       <div className="page-header">
-        <h1 className="page-title">📊 Dashboard — Analíticas</h1>
+        <h1 className="page-title"><IconBarChart /> Dashboard — Analíticas</h1>
         <p className="page-subtitle">Resumen del almacén y flujo de materiales</p>
       </div>
 
@@ -113,62 +201,26 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ─── Alertas de Stock ─────────────────────────── */}
+      {/* ─── Alertas de Stock — Galería Horizontal ─────── */}
       {(alertas.urge.length > 0 || alertas.ordenar.length > 0) && (
         <div className="card mb-8">
-          <h2 className="dashboard-section-title">🚨 Alertas de Stock</h2>
+          <h2 className="dashboard-section-title"><IconAlertTriangle /> Alertas de Stock</h2>
 
           {alertas.urge.length > 0 && (
             <div className="alertas-group">
               <h3 className="alertas-group-title alertas-group-title--urge">
-                🔴 URGE — Acción inmediata ({alertas.urge.length})
+                URGE — Acción inmediata ({alertas.urge.length})
               </h3>
-              <div className="alertas-grid">
-                {alertas.urge.map(m => (
-                  <div key={m.id} className="alerta-card alerta-card--urge">
-                    <div className="alerta-header">
-                      <div className="alerta-code font-mono">{m.code}</div>
-                      {m.active_order && (
-                        <div className={`alerta-order-badge alerta-order-badge--${m.active_order.status}`}>
-                          📦 {m.active_order.label}
-                        </div>
-                      )}
-                    </div>
-                    <div className="alerta-name">{m.name}</div>
-                    <div className="alerta-stock">
-                      <span className="alerta-stock-num">{m.stock_actual}</span>
-                      <span className="alerta-stock-unit">{m.unit}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <AlertaGallery items={alertas.urge} type="urge" />
             </div>
           )}
 
           {alertas.ordenar.length > 0 && (
             <div className="alertas-group">
               <h3 className="alertas-group-title alertas-group-title--ordenar">
-                ⚠️ ORDENAR — Stock bajo ({alertas.ordenar.length})
+                ORDENAR — Stock bajo ({alertas.ordenar.length})
               </h3>
-              <div className="alertas-grid">
-                {alertas.ordenar.map(m => (
-                  <div key={m.id} className="alerta-card alerta-card--ordenar">
-                    <div className="alerta-header">
-                      <div className="alerta-code font-mono">{m.code}</div>
-                      {m.active_order && (
-                        <div className={`alerta-order-badge alerta-order-badge--${m.active_order.status}`}>
-                          📦 {m.active_order.label}
-                        </div>
-                      )}
-                    </div>
-                    <div className="alerta-name">{m.name}</div>
-                    <div className="alerta-stock">
-                      <span className="alerta-stock-num">{m.stock_actual}</span>
-                      <span className="alerta-stock-unit">{m.unit}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <AlertaGallery items={alertas.ordenar} type="ordenar" />
             </div>
           )}
         </div>
@@ -177,7 +229,7 @@ export default function Dashboard() {
       {/* ─── Sugerencias de Compra (Predicciones) ────── */}
       {sugerencias.length > 0 && (
         <div className="card mb-8">
-          <h2 className="dashboard-section-title">🔮 Sugerencias Especiales de Compra</h2>
+          <h2 className="dashboard-section-title"><IconTrendingUp /> Sugerencias de Compra</h2>
           <p className="page-subtitle" style={{marginBottom: 'var(--space-4)'}}>Recomendaciones basadas en consumo reciente (últimos 60 días) y tiempos promedio de entrega.</p>
           <div className="table-container">
             <table className="table">
@@ -225,11 +277,11 @@ export default function Dashboard() {
       <div className="dashboard-charts">
         {/* Consumo por línea */}
         <div className="card">
-          <h2 className="dashboard-section-title">📈 Consumo por Línea (30 días)</h2>
+          <h2 className="dashboard-section-title"><IconActivity /> Consumo por Línea (30 días)</h2>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={consumo} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="linea" tick={{ fill: 'var(--color-text-secondary)', fontSize: 12 }} />
+              <XAxis dataKey="linea_nombre" tick={{ fill: 'var(--color-text-secondary)', fontSize: 12 }} />
               <YAxis tick={{ fill: 'var(--color-text-secondary)', fontSize: 12 }} />
               <Tooltip
                 contentStyle={{
@@ -246,7 +298,7 @@ export default function Dashboard() {
 
         {/* Estado de stock — Pie */}
         <div className="card">
-          <h2 className="dashboard-section-title">🎯 Estado del Inventario</h2>
+          <h2 className="dashboard-section-title"><IconPieChart /> Estado del Inventario</h2>
           <ResponsiveContainer width="100%" height={280}>
             <PieChart>
               <Pie
@@ -282,7 +334,7 @@ export default function Dashboard() {
       <div className="dashboard-bottom">
         {/* Top materiales más despachados */}
         <div className="card">
-          <h2 className="dashboard-section-title">🏆 Top Materiales Despachados (30 días)</h2>
+          <h2 className="dashboard-section-title"><IconAward /> Top Materiales Despachados (30 días)</h2>
           <div className="table-container">
             <table className="table">
               <thead>
@@ -313,7 +365,7 @@ export default function Dashboard() {
 
         {/* Vales de Consumo (Salidas Recientes) */}
         <div className="card">
-          <h2 className="dashboard-section-title">📄 Vales de Consumo Recientes</h2>
+          <h2 className="dashboard-section-title"><IconFileText /> Vales de Consumo Recientes</h2>
           <div className="dashboard-vales-list">
             {recientes.vales?.length === 0 ? (
               <p className="text-muted text-center py-4">Sin vales registrados recientemente</p>
@@ -322,7 +374,7 @@ export default function Dashboard() {
                 <div key={vale.id} className="vale-card" onClick={() => setSelectedVale(vale)}>
                   <div className="vale-card-main">
                     <span className="vale-card-folio">VALE #{vale.recibo_no || vale.id}</span>
-                    <span className="vale-card-dest">{vale.area || 'General'} · {vale.seccion || 'Sin sección'}</span>
+                    <span className="vale-card-dest">{vale.linea || 'General'} · {vale.area || 'Sin área'}</span>
                     <span className="vale-card-meta">
                       {vale.recibio} · {new Date(vale.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
@@ -338,7 +390,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ─── Modal Visa Rápida ────────────────────────────── */}
+      {/* ─── Modal Vista Rápida ────────────────────────────── */}
       {selectedVale && (
         <div className="quick-view-overlay" onClick={() => setSelectedVale(null)}>
           <div className="quick-view-modal" onClick={e => e.stopPropagation()}>
@@ -372,7 +424,7 @@ export default function Dashboard() {
               </div>
               <div className="detail-row">
                 <span className="detail-label">Destino:</span>
-                <span className="detail-value">{selectedVale.area} / {selectedVale.seccion}</span>
+                <span className="detail-value">{selectedVale.linea} / {selectedVale.area}</span>
               </div>
               <div className="detail-row">
                 <span className="detail-label">Turno:</span>

@@ -1,21 +1,25 @@
-# Etapa 1: Compilar la aplicación React (Vite)
-FROM node:20-alpine as build
+# Etapa 1: Build de React
+FROM node:20-alpine as build-stage
+
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install
+# Copiar archivos de dependencia
+COPY package.json yarn.lock* ./
+RUN yarn install
 
+# Copiar el resto de los archivos y construir
 COPY . .
-RUN npm run build
+RUN yarn build
 
 # Etapa 2: Servidor NGINX
-FROM nginx:alpine
+FROM nginx:stable-alpine
 
-# Copiar el archivo de configuración de NGINX
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copiar los archivos construidos desde la etapa anterior
+COPY --from=build-stage /app/dist /usr/share/nginx/html
 
-# Copiar los archivos compilados de React
-COPY --from=build /app/dist /usr/share/nginx/html
+# Copiar configuración personalizada de NGINX
+# Nota: La configuración se inyectará desde el docker-compose o se puede copiar aquí
+# COPY ../nginx/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 

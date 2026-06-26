@@ -4,6 +4,7 @@ import { ToastProvider } from './context/ToastContext'
 import { ThemeProvider } from './context/ThemeContext'
 import Layout from './components/Layout/Layout'
 import Login from './pages/Login/Login'
+import ChangePassword from './pages/Auth/ChangePassword'
 import Entradas from './pages/Entradas/Entradas'
 import Vales from './pages/Vales/Vales'
 import Materiales from './pages/Materiales/Materiales'
@@ -24,10 +25,17 @@ function RootRedirect() {
 }
 
 /** Ruta protegida — redirige a login si no hay sesión */
-function PrivateRoute({ children }) {
+function PrivateRoute({ children, checkPasswordChange = true }) {
   const { user, loading } = useAuth()
   if (loading) return <div className="loading-container"><div className="spinner" /></div>
-  return user ? children : <Navigate to="/login" replace />
+  
+  if (!user) return <Navigate to="/login" replace />
+  
+  if (checkPasswordChange && user.must_change_password) {
+    return <Navigate to="/cambiar-password" replace />
+  }
+
+  return children
 }
 
 /** Ruta protegida por rol */
@@ -47,6 +55,7 @@ export default function App() {
           <AuthProvider>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/cambiar-password" element={<PrivateRoute checkPasswordChange={false}><ChangePassword /></PrivateRoute>} />
               <Route
                 path="/"
                 element={
@@ -68,7 +77,7 @@ export default function App() {
                 {/* Rutas Admin/Supervisor */}
                 <Route path="dashboard"   element={<RoleRoute allowedRoles={['manager', 'supervisor']}><Dashboard /></RoleRoute>} />
                 <Route path="historial"   element={<RoleRoute allowedRoles={['manager', 'supervisor']}><Historial /></RoleRoute>} />
-                <Route path="ordenes"     element={<RoleRoute allowedRoles={['manager', 'supervisor']}><OrdenesCompra /></RoleRoute>} />
+                <Route path="ordenes"     element={<RoleRoute allowedRoles={['manager', 'supervisor', 'capturista']}><OrdenesCompra /></RoleRoute>} />
                 <Route path="categorias"  element={<RoleRoute allowedRoles={['manager', 'supervisor']}><Categorias /></RoleRoute>} />
                 <Route path="proveedores" element={<RoleRoute allowedRoles={['manager', 'supervisor']}><Proveedores /></RoleRoute>} />
               </Route>

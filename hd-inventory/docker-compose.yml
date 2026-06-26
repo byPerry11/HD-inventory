@@ -52,12 +52,12 @@ services:
              python manage.py migrate --noinput &&
              uvicorn core_main_hdinventory.asgi:application --host 0.0.0.0 --port 8000"
 
-  # ─── Frontend React (Vite Dev Server) ───────────────────────
-  frontend:
+  # ─── Frontend React (Development Server) ────────────────────
+  frontend-dev:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: hdinventory_frontend
+    container_name: hdinventory_frontend_dev
     restart: unless-stopped
     env_file:
       - .env
@@ -68,6 +68,24 @@ services:
       - /app/node_modules
     depends_on:
       - backend
+
+  # ─── Servidor Web NGINX (Proxy Inverso + Frontend Prod) ─────
+  nginx:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: hdinventory_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - static_volume:/app/staticfiles:ro
+      - ./media:/app/media:ro
+    depends_on:
+      - backend
+
+
 
 volumes:
   pgdata:

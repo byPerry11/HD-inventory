@@ -32,15 +32,15 @@ export default function Vales() {
         {loading ? <div className="loading-container"><div className="spinner" /></div> : (
           <table className="table">
             <thead>
-              <tr><th>Recibo</th><th>Área / Sección</th><th>Fecha</th><th>Empleado</th><th>Material</th><th>Cantidad</th><th>Acciones</th></tr>
+              <tr><th>Recibo</th><th>Línea / Área</th><th>Fecha</th><th>Empleado</th><th>Material</th><th>Cantidad</th><th>Acciones</th></tr>
             </thead>
             <tbody>
               {vales.map(v => (
                 <tr key={v.id}>
                   <td>{v.recibo_no}</td>
                   <td>
-                    <div style={{fontSize: '0.85rem'}}>{v.area_nombre}</div>
-                    <div style={{fontSize: '0.75rem', color:'var(--text-muted)'}}>{v.seccion_nombre}</div>
+                    <div style={{fontSize: '0.85rem'}}>{v.linea_nombre}</div>
+                    <div style={{fontSize: '0.75rem', color:'var(--text-muted)'}}>{v.area_nombre}</div>
                   </td>
                   <td>{new Date(v.fecha).toLocaleString()}</td>
                   <td>{v.empleado_no} — {v.empleado_nombre}</td>

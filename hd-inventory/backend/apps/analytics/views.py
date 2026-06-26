@@ -2,7 +2,8 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.db.models import Sum, Count, F
+from django.db.models import Sum, Count, F, Value
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from datetime import timedelta
 
@@ -69,7 +70,13 @@ class ConsumoPorLineaView(APIView):
         consumo = (
             Salida.objects
             .filter(fecha__gte=desde)
-            .values(linea_nombre=F('linea__nombre'))
+            .values(
+                linea_nombre=Coalesce(
+                    F('linea__nombre'),
+                    F('linea_legacy'),
+                    Value('Sin asignar')
+                )
+            )
             .annotate(
                 total_movimientos=Count('id'),
                 total_unidades=Sum('cantidad'),
@@ -310,3 +317,51 @@ class SugerenciasCompraView(APIView):
 
         return Response(sugerencias[:15])  # Top 15 más urgentes
 
+
+class ConsumoPorAreaView(APIView):
+    """
+    Consumo de materiales agrupado por línea y área.
+    Permite filtrado más preciso combinando datos legacy y FK modernos.
+    """
+    permission_classes = [IsSupervisorOrAbove]
+
+    def get(self, request):
+        dias = int(request.query_params.get('dias', 30))
+        linea_filter = request.query_params.get('linea', None)
+        desde = timezone.now() - timedelta(days=dias)
+
+        qs = Salida.objects.filter(fecha__gte=desde)
+
+        if linea_filter:
+            # Filtrar por nombre de línea (FK o legacy)
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(linea__nombre=linea_filter) | Q(linea_legacy=linea_filter)
+            )
+
+        consumo = (
+            qs
+            .values(
+                linea_nombre=Coalesce(
+                    F('linea__nombre'),
+                    F('linea_legacy'),
+                    Value('Sin asignar')
+                ),
+                area_nombre=Coalesce(
+                    F('area__nombre'),
+                    F('seccion_legacy'),
+                    Value('General')
+                ),
+            )
+            .annotate(
+                total_movimientos=Count('id'),
+                total_unidades=Sum('cantidad'),
+            )
+            .order_by('linea_nombre', '-total_unidades')
+        )
+
+        return Response({
+            'dias': dias,
+            'linea': linea_filter,
+            'data': list(consumo),
+        })

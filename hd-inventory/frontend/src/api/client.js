@@ -5,10 +5,7 @@
  */
 import axios from 'axios'
 
-const host = window.location.hostname
-const apiBase = `http://${host}:8000/api`
-
-console.log('API Base URL:', apiBase)
+const apiBase = '/api'
 
 const api = axios.create({
   baseURL: apiBase,

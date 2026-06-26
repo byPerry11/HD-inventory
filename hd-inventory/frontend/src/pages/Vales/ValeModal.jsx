@@ -5,14 +5,15 @@ import { printVale } from '../../utils/printUtils'
 
 export default function ValeModal({ open, onClose, preselectedMaterial }) {
   const EMPTY = {
-    empleado_no: '', empleado_nombre: '', area: '', seccion: '', material: '', aut: '', cantidad: '', costo: '', observaciones: ''
+    empleado_no: '', empleado_nombre: '', linea: '', area: '', material: '', aut: '', cantidad: '', costo: '', observaciones: ''
   }
   const [form, setForm] = useState(EMPTY)
   const [materiales, setMateriales] = useState([])
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [choices, setChoices] = useState({ areas: [], secciones: [], turnos: [] })
+  const [choices, setChoices] = useState({ lineas: [], areas: [], turnos: [] })
+  const [filteredAreas, setFilteredAreas] = useState([])
 
   useEffect(() => { 
     if (open) {
@@ -27,6 +28,19 @@ export default function ValeModal({ open, onClose, preselectedMaterial }) {
       setChoices(data)
     } catch (e) { console.error('Error fetching choices', e) }
   }
+
+  useEffect(() => {
+    if (form.linea) {
+      const filtered = choices.areas.filter(a => a.linea === parseInt(form.linea))
+      setFilteredAreas(filtered)
+      if (form.area && !filtered.find(a => a.value === parseInt(form.area))) {
+        setForm(f => ({ ...f, area: '' }))
+      }
+    } else {
+      setFilteredAreas([])
+      setForm(f => ({ ...f, area: '' }))
+    }
+  }, [form.linea, choices.areas])
 
   useEffect(() => {
     if (preselectedMaterial) {
@@ -197,6 +211,19 @@ export default function ValeModal({ open, onClose, preselectedMaterial }) {
 
           <div className="salidas-row">
             <div className="form-group">
+              <label className="form-label">Línea *</label>
+              <select 
+                name="linea" 
+                className="form-control"
+                value={form.linea} 
+                onChange={handleChange}
+                required
+              >
+                <option value="">— Seleccionar —</option>
+                {choices.lineas.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
               <label className="form-label">Área *</label>
               <select 
                 name="area" 
@@ -204,22 +231,10 @@ export default function ValeModal({ open, onClose, preselectedMaterial }) {
                 value={form.area} 
                 onChange={handleChange}
                 required
+                disabled={!form.linea}
               >
                 <option value="">— Seleccionar —</option>
-                {choices.areas.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Sección *</label>
-              <select 
-                name="seccion" 
-                className="form-control"
-                value={form.seccion} 
-                onChange={handleChange}
-                required
-              >
-                <option value="">— Seleccionar —</option>
-                {choices.secciones.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                {filteredAreas.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
               </select>
             </div>
           </div>

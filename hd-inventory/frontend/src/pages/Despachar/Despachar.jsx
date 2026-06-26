@@ -21,17 +21,34 @@ export default function Despachar() {
   const searchInputRef = useRef(null)
 
   // Opciones
-  const [areas, setAreas] = useState([])
+  const [lineas, setLineas] = useState([])
   const [turnos, setTurnos] = useState([])
-  const [secciones, setSecciones] = useState([])
+  const [allAreas, setAllAreas] = useState([]) // Todas las áreas del servidor
+  const [filteredAreas, setFilteredAreas] = useState([]) // Áreas filtradas por línea
 
   // Formularios con persistencia
-  const [config, setConfig] = usePersistentState('hd_despachar_config', { area: '', seccion: '', turno: '', empleado_no: '', recibio: '', observaciones: '' }, 'session')
+  const [config, setConfig] = usePersistentState('hd_despachar_config', { linea: '', area: '', turno: '', empleado_no: '', recibio: '', observaciones: '' }, 'session')
 
   useEffect(() => {
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Filtrar áreas cuando cambia la línea seleccionada
+  useEffect(() => {
+    if (config.linea) {
+      const filtered = allAreas.filter(a => a.linea === parseInt(config.linea))
+      setFilteredAreas(filtered)
+      // Si el área seleccionada no pertenece a la nueva línea, limpiarla
+      if (config.area && !filtered.find(a => a.id === parseInt(config.area))) {
+        setConfig(prev => ({ ...prev, area: '' }))
+      }
+    } else {
+      setFilteredAreas([])
+      setConfig(prev => ({ ...prev, area: '' }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.linea, allAreas])
 
   const lookupEmpleado = async (numero) => {
     try {
@@ -66,34 +83,15 @@ export default function Despachar() {
         client.get('/materials/?page_size=1000'),
         client.get('/inventory/salidas/choices/'),
         client.get('/materials/categorias/'),
-        client.get('/inventory/secciones/?page_size=1000')
       ])
       setMaterials(matRes.data.results || matRes.data)
-      setAreas(optsRes.data.areas || [])
+      setLineas(optsRes.data.lineas || [])
       setTurnos(optsRes.data.turnos || [])
       setCategories(catRes.data.results || catRes.data)
-      setSecciones(optsRes.data.secciones || [])
+      setAllAreas(optsRes.data.areas || [])
     } catch (err) {
       console.error('Error fetching despachar data:', err)
       notify.error('No se pudo cargar el catálogo de materiales.')
-    }
-  }
-
-  const handleCreateSeccion = async () => {
-    const nombre = prompt('Ingresa el nombre de la nueva sección:')
-    if (!nombre) return
-
-    try {
-      setLoading(true)
-      const res = await client.post('/inventory/secciones/', { nombre: nombre.trim() })
-      setSecciones(prev => [...prev, res.data].sort((a, b) => a.nombre.localeCompare(b.nombre)))
-      setConfig(prev => ({ ...prev, seccion: res.data.nombre }))
-      notify.success('Sección registrada correctamente')
-    } catch (err) {
-      console.error(err)
-      notify.error(err.response?.data?.nombre?.[0] || 'Error al crear la sección')
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -223,8 +221,8 @@ export default function Despachar() {
 
   const handleCheckout = async () => {
     if (!cart.length) return
-    if (!config.area || !config.turno || !config.recibio.trim()) {
-      notify.warning('Completa Área, Turno y Quien Recibe antes de confirmar.')
+    if (!config.linea || !config.turno || !config.recibio.trim()) {
+      notify.warning('Completa Línea, Turno y Quien Recibe antes de confirmar.')
       return
     }
 
@@ -232,8 +230,8 @@ export default function Despachar() {
     try {
       const payload = {
         items: cart.map(i => ({ material: i.material.id, cantidad: i.cantidad, observaciones: i.observaciones })),
-        area: config.area,
-        seccion: config.seccion,
+        linea: config.linea,
+        area: config.area || null,
         turno: config.turno,
         empleado_no: config.empleado_no,
         recibio: config.recibio,
@@ -305,6 +303,13 @@ export default function Despachar() {
               placeholder="Escanea el código de barras o busca material..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleScan(search.trim())
+                  setSearch('')
+                  e.preventDefault()
+                }
+              }}
               autoFocus
             />
           </div>
@@ -356,42 +361,32 @@ export default function Despachar() {
               </select>
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Área *</label>
+              <label>Línea *</label>
               <select
                 className="form-control"
                 style={{ height: '38px' }}
-                value={config.area}
-                onChange={e => setConfig({...config, area: e.target.value})}
+                value={config.linea}
+                onChange={e => setConfig({...config, linea: e.target.value})}
               >
                 <option value="">Selecciona...</option>
-                {areas.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+                {lineas.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
               </select>
             </div>
           </div>
           <div className="config-row">
             <div className="form-group" style={{ marginBottom: 0, position: 'relative' }}>
-              <label>Sección</label>
+              <label>Área</label>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <select
                   className="form-control"
                   style={{ height: '38px', flex: 1 }}
-                  value={config.seccion || ''}
-                  onChange={e => setConfig({...config, seccion: e.target.value})}
+                  value={config.area || ''}
+                  onChange={e => setConfig({...config, area: e.target.value})}
+                  disabled={!config.linea}
                 >
                   <option value="">Selecciona...</option>
-                  {secciones.map(sec => <option key={sec.value} value={sec.value}>{sec.label}</option>)}
+                  {filteredAreas.map(area => <option key={area.value} value={area.value}>{area.label}</option>)}
                 </select>
-
-                {isPrivileged && (
-                  <button 
-                    className="btn btn-secondary" 
-                    style={{ height: '38px', padding: '0 12px' }}
-                    onClick={handleCreateSeccion}
-                    title="Registrar nueva sección"
-                  >
-                    + Nueva
-                  </button>
-                )}
               </div>
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -484,3 +479,4 @@ export default function Despachar() {
     </div>
   )
 }
+

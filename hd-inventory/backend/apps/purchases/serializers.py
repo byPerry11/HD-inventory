@@ -41,6 +41,7 @@ class OrdenCompraSerializer(serializers.ModelSerializer):
             'fecha_po_aprobada',
             'fecha_ordenado',
             'fecha_recibido',
+            'recibido_por',
             'tiempo_entrega_dias',
             'vendedor',
             'proveedor_ref',

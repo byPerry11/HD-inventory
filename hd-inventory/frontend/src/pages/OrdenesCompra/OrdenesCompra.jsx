@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
 import api from '../../api/client'
 import { useToast } from '../../context/ToastContext'
+import { useAuth } from '../../context/AuthContext'
 import './OrdenesCompra.css'
 
 export default function OrdenesCompra() {
+  const { user } = useAuth()
+  const isCapturista = user?.role === 'capturista'
   const [ordenes, setOrdenes] = useState([])
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
@@ -25,6 +28,11 @@ export default function OrdenesCompra() {
   const [showStepModal, setShowStepModal] = useState(false)
   const [activeStepOrden, setActiveStepOrden] = useState(null)
   const [poNumberInput, setPoNumberInput] = useState('')
+  const [recibidoPorInput, setRecibidoPorInput] = useState('')
+  
+  // Modal de detalles
+  const [showDetailsModal, setShowDetailsModal] = useState(false)
+  const [selectedOrden, setSelectedOrden] = useState(null)
   
   // Sugerencias de número de parte
   const [suggestions, setSuggestions] = useState([])
@@ -129,12 +137,21 @@ export default function OrdenesCompra() {
         }
         payload.po_number = poNumberInput
       }
+      
+      if (getNextStatus(activeStepOrden) === 'recibido' || getNextStatus(activeStepOrden) === 'rem_recibido') {
+        if (!recibidoPorInput) {
+          notify.warning('El nombre de quien recibe es requerido')
+          return
+        }
+        payload.recibido_por = recibidoPorInput
+      }
 
       await api.post(`/purchases/ordenes/${activeStepOrden.id}/advance-step/`, payload)
       notify.success('Estado actualizado correctamente')
       setShowStepModal(false)
       setActiveStepOrden(null)
       setPoNumberInput('')
+      setRecibidoPorInput('')
       fetchOrdenes()
     } catch (err) {
       const msg = err.response?.data?.error || 'Error al avanzar de estado'
@@ -217,13 +234,16 @@ export default function OrdenesCompra() {
   }
 
   return (
-    <div className="ordenes-view animate-fade-in">
-      <header className="ordenes-header">
+    <div className="page-container animate-fade-in">
+      <div className="page-header">
         <div>
-          <h1 className="ordenes-title">Control de Órdenes</h1>
-          <p className="ordenes-subtitle">Flujo lineal de adquisiciones y recepciones</p>
+          <h1 className="page-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+            Control de Órdenes
+          </h1>
+          <p className="page-subtitle">Flujo lineal de adquisiciones y recepciones</p>
         </div>
-        <div className="ordenes-actions">
+        <div className="page-actions" style={{ display: 'flex', gap: '8px' }}>
           {isEditing ? (
             <>
               <button className="btn btn-secondary" onClick={toggleEditMode}>Cancelar</button>
@@ -234,24 +254,31 @@ export default function OrdenesCompra() {
             </>
           ) : (
             <>
-              <button className="btn btn-secondary" onClick={toggleEditMode}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                Editar Datos
-              </button>
-              <button className="btn btn-primary" onClick={() => setIsCreating(true)}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                Nueva Orden
-              </button>
+              {!isCapturista && (
+                <>
+                  <button className="btn btn-secondary" onClick={toggleEditMode}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    Editar Datos
+                  </button>
+                  <button className="btn btn-primary" onClick={() => setIsCreating(true)}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    Nueva Orden
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>
-      </header>
+      </div>
 
-      <div className="ordenes-table-container">
+      <div className="table-container">
         {loading ? (
-          <div className="loading-state">Cargando flujo de órdenes...</div>
+          <div className="loading-container">
+            <div className="spinner" />
+            <span>Cargando flujo de órdenes...</span>
+          </div>
         ) : (
-          <table className="ordenes-table">
+          <table className="table">
             <thead>
               <tr>
                 <th>Emisión</th>
@@ -276,7 +303,15 @@ export default function OrdenesCompra() {
                 const nextStep = getNextStatus(orden)
 
                 return (
-                  <tr key={orden.id} className={`orden-row--${orden.status} ${isItemEditing ? 'row-editing' : ''} ${isCerrada ? 'row-locked' : ''}`}>
+                  <tr 
+                    key={orden.id} 
+                    className={`orden-row--${orden.status} ${isItemEditing ? 'row-editing' : ''} ${isCerrada ? 'row-locked' : ''}`}
+                    onDoubleClick={() => {
+                      setSelectedOrden(orden)
+                      setShowDetailsModal(true)
+                    }}
+                    title="Doble clic para ver detalles"
+                  >
                     <td className="text-secondary" style={{ whiteSpace: 'nowrap' }}>{orden.fecha_emision}</td>
                     
                     {/* No. PR */}
@@ -320,8 +355,8 @@ export default function OrdenesCompra() {
                     <td>
                       <div className="status-cell">
                         <button 
-                          className={`status-badge-btn ${!nextStep ? 'is-final' : ''}`}
-                          disabled={!nextStep}
+                          className={`status-badge-btn ${!nextStep || isCapturista ? 'is-final' : ''}`}
+                          disabled={!nextStep || isCapturista}
                           onClick={() => {
                             setActiveStepOrden(orden)
                             setShowStepModal(true)
@@ -332,8 +367,14 @@ export default function OrdenesCompra() {
                           }}
                         >
                           {STATUS_COLORS[orden.status]?.label}
-                          {nextStep && <span className="advance-icon">→</span>}
+                          {nextStep && !isCapturista && <span className="advance-icon">→</span>}
                         </button>
+
+                        {(orden.status === 'recibido' || orden.status === 'rem_recibido') && orden.recibido_por && (
+                          <div className="received-by-info" style={{ fontSize: '0.75rem', marginTop: '4px', opacity: 0.8, fontWeight: 500 }}>
+                            Recibió: {orden.recibido_por}
+                          </div>
+                        )}
                         
                         <div className="mini-stepper">
                            {(orden.es_remision ? FLUJO_REM : FLUJO_ESTANDAR).map(s => (
@@ -382,7 +423,7 @@ export default function OrdenesCompra() {
 
                     <td>
                       <div className="row-actions">
-                        {!isCerrada && (
+                        {!isCerrada && !isCapturista && (
                           <button 
                             className="btn-icon text-urge" 
                             title="Cancelar Orden"
@@ -553,19 +594,33 @@ export default function OrdenesCompra() {
                  {getNextStatus(activeStepOrden) === 'recibido' && ' Esta acción sumará el material al inventario.'}
                </p>
 
-               {getNextStatus(activeStepOrden) === 'po_aprobada' && (
-                 <div className="form-group mt-6">
-                    <label>Ingresa el No. de PO para continuar</label>
-                    <input 
-                      type="text" 
-                      className="input-text" 
-                      placeholder="PO-XXXX"
-                      autoFocus
-                      value={poNumberInput}
-                      onChange={e => setPoNumberInput(e.target.value)}
-                    />
-                 </div>
-               )}
+                 {getNextStatus(activeStepOrden) === 'po_aprobada' && (
+                  <div className="form-group mt-6">
+                     <label>Ingresa el No. de PO para continuar</label>
+                     <input 
+                       type="text" 
+                       className="input-text" 
+                       placeholder="PO-XXXX"
+                       autoFocus
+                       value={poNumberInput}
+                       onChange={e => setPoNumberInput(e.target.value)}
+                     />
+                  </div>
+                )}
+
+                {(getNextStatus(activeStepOrden) === 'recibido' || getNextStatus(activeStepOrden) === 'rem_recibido') && (
+                  <div className="form-group mt-6">
+                     <label>¿Quién recibe el material?</label>
+                     <input 
+                       type="text" 
+                       className="input-text" 
+                       placeholder="Nombre completo"
+                       autoFocus
+                       value={recibidoPorInput}
+                       onChange={e => setRecibidoPorInput(e.target.value)}
+                     />
+                  </div>
+                )}
             </div>
             <div className="modal-actions p-6">
               <button className="btn btn-secondary" onClick={() => setShowStepModal(false)}>Cancelar</button>
@@ -574,6 +629,135 @@ export default function OrdenesCompra() {
           </div>
         </div>
       )}
+      {/* Modal: Detalles de la Orden */}
+      {showDetailsModal && selectedOrden && (() => {
+        // Calcular tiempo total de proceso
+        let tiempoTotalLabel = null
+        if (selectedOrden.fecha_emision && selectedOrden.fecha_recibido) {
+          const inicio = new Date(selectedOrden.fecha_emision)
+          const fin = new Date(selectedOrden.fecha_recibido)
+          const diffDias = Math.round((fin - inicio) / (1000 * 60 * 60 * 24))
+          tiempoTotalLabel = diffDias === 0 ? 'Mismo día' : `${diffDias} día${diffDias !== 1 ? 's' : ''}`
+        }
+
+        return (
+        <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}>
+          <div className="modal-content modal-content--details" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">Detalles de la Orden #{selectedOrden.id}</h2>
+              <button className="btn-close" onClick={() => setShowDetailsModal(false)}>&times;</button>
+            </div>
+            <div className="modal-body p-6">
+              <div className="details-grid">
+                <div className="details-main">
+                  <div className="detail-item">
+                    <label>No. Parte</label>
+                    <span className="fw-600">{selectedOrden.no_parte}</span>
+                  </div>
+                  <div className="detail-item">
+                    <label>Descripción</label>
+                    <span>{selectedOrden.descripcion}</span>
+                  </div>
+                  <div className="detail-item">
+                    <label>Cantidad</label>
+                    <span>{selectedOrden.cantidad}</span>
+                  </div>
+                  {selectedOrden.vendedor && (
+                    <div className="detail-item">
+                      <label>Proveedor</label>
+                      <span>{selectedOrden.vendedor}</span>
+                    </div>
+                  )}
+                  {selectedOrden.po_number && (
+                    <div className="detail-item">
+                      <label>No. PO</label>
+                      <span className="font-mono fw-600">{selectedOrden.po_number}</span>
+                    </div>
+                  )}
+                  {selectedOrden.no_pr && (
+                    <div className="detail-item">
+                      <label>No. PR</label>
+                      <span className="font-mono">{selectedOrden.no_pr}</span>
+                    </div>
+                  )}
+                  <div className="detail-item">
+                    <label>Creado por</label>
+                    <span>{selectedOrden.creado_por_nombre || 'Desconocido'}</span>
+                  </div>
+                  {selectedOrden.recibido_por && (
+                    <div className="detail-item">
+                      <label>Recibido por</label>
+                      <span className="text-success fw-600">{selectedOrden.recibido_por}</span>
+                    </div>
+                  )}
+                  {tiempoTotalLabel && (
+                    <div className="detail-item">
+                      <label>Tiempo Total de Proceso</label>
+                      <span className="fw-600" style={{ color: 'var(--color-accent)' }}>{tiempoTotalLabel}</span>
+                    </div>
+                  )}
+                  {selectedOrden.tiempo_entrega_dias != null && (
+                    <div className="detail-item">
+                      <label>Lead Time (PO → Recibido)</label>
+                      <span>{selectedOrden.tiempo_entrega_dias} días</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="details-timeline">
+                  <h3 className="timeline-title">Línea de Tiempo</h3>
+                  <div className="timeline-container">
+                    {[
+                      { key: 'fecha_emision', label: 'Emisión de Orden', status: 'pr_creada' },
+                      ...(selectedOrden.es_remision ? [
+                        { key: 'fecha_pr', label: 'Pedido REM', status: 'pedido_rem' },
+                        { key: 'fecha_recibido', label: 'REM Recibido', status: 'rem_recibido', showRecibidoPor: true },
+                      ] : [
+                        { key: 'fecha_pr', label: 'PR Creada', status: 'pr_creada' },
+                        { key: 'fecha_pr_aprobada', label: 'PR Aprobada', status: 'pr_aprobada' },
+                        { key: 'fecha_po_aprobada', label: 'PO Aprobada', status: 'po_aprobada' },
+                        { key: 'fecha_ordenado', label: 'Ordenado', status: 'ordenado' },
+                        { key: 'fecha_recibido', label: 'Recibido', status: 'recibido', showRecibidoPor: true },
+                      ])
+                    ].map((step, idx) => {
+                      const dateVal = selectedOrden[step.key]
+                      const isDone = !!dateVal
+                      const isCurrent = selectedOrden.status === step.status && !isDone
+                      
+                      return (
+                        <div key={step.key} className={`timeline-step ${isDone ? 'is-done' : ''} ${isCurrent ? 'is-current' : ''}`}>
+                          <div className="timeline-marker">
+                            <div className="timeline-dot"></div>
+                            {idx < (selectedOrden.es_remision ? 2 : 5) && <div className="timeline-line"></div>}
+                          </div>
+                          <div className="timeline-content">
+                            <span className="timeline-label">{step.label}</span>
+                            <span className="timeline-date">
+                              {dateVal ? new Date(dateVal).toLocaleString('es-MX', { 
+                                year: 'numeric', month: 'short', day: 'numeric', 
+                                hour: '2-digit', minute: '2-digit' 
+                              }) : (isCurrent ? 'En curso...' : 'Pendiente')}
+                            </span>
+                            {step.showRecibidoPor && selectedOrden.recibido_por && isDone && (
+                              <span className="timeline-receiver">
+                                Recibió: {selectedOrden.recibido_por}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-actions p-6">
+              <button className="btn btn-secondary" onClick={() => setShowDetailsModal(false)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+        )
+      })()}
     </div>
   )
 }

@@ -15,7 +15,7 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me')
 DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
-    default='localhost,127.0.0.1,backend,0.0.0.0,mxtjsf225,mxtjsf225.tpvaoc.com,mxtj225.inventory',
+    default='localhost,127.0.0.1,backend,0.0.0.0,mxtjsf225,mxtjsf225.tpvaoc.com,mxtj225.inventory,192.168.10.163',
     cast=Csv()
 )
 
@@ -144,6 +144,9 @@ CORS_ALLOWED_ORIGINS = [
     'http://mxtjsf225.tpvaoc.com:5173',
     'http://localhost:3000',
     'http://mxtj225.inventory',
+    'http://mxtjsf225',
+    'http://mxtjsf225.tpvaoc.com',
+    'http://192.168.10.163',
 ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -152,6 +155,9 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:5173',
     'http://mxtjsf225:5173',
     'http://mxtjsf225.tpvaoc.com:5173',
+    'http://mxtjsf225',
+    'http://mxtjsf225.tpvaoc.com',
+    'http://192.168.10.163',
 ]
 
 # ─── Internacionalización ─────────────────────────────────────
@@ -167,6 +173,16 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ─── WhiteNoise — Servir estáticos del admin ──────────────────
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # ─── Admin site ───────────────────────────────────────────────
 ADMIN_SITE_HEADER = 'Almacén de Materiales PE — Admin'

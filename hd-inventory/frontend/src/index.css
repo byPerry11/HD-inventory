@@ -154,6 +154,7 @@ input, select, textarea {
   margin-left: var(--sidebar-width);
   padding: var(--space-8);
   min-height: 100vh;
+  min-width: 0; /* Critical for flex child to allow inner scroll */
 }
 
 /* ─── Cards ─────────────────────────────────────────────── */
@@ -163,6 +164,8 @@ input, select, textarea {
   border-radius: var(--radius-lg);
   padding: var(--space-6);
   box-shadow: var(--shadow-sm);
+  overflow: hidden;           /* Prevent children from expanding card */
+  min-width: 0;               /* Allow shrinking in flex/grid contexts */
 }
 
 .card:hover {

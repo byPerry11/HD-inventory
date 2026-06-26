@@ -65,18 +65,28 @@ class MaterialViewSet(viewsets.ModelViewSet):
         instance.activo = False
         instance.save(update_fields=['activo'])
 
-    @action(detail=False, methods=['get'], url_path='reports/chemical-inventory')
-    def reports_chemical_inventory(self, request):
-        """Genera y descarga el reporte de Inventario de Químicos.
-
-        Filtra materiales cuya categoría contenga 'quimic' (insensible a mayúsculas).
+    @action(detail=False, methods=['get'], url_path='reports/custom-inventory')
+    def reports_custom_inventory(self, request):
+        """Genera y descarga un reporte de inventario dinámico por categorías.
+        
+        Espera un parámetro `categories` con IDs separados por comas.
         """
-        # Restrict access to supervisors and managers explicitly
         role = getattr(request.user, 'role', None)
         if role not in ('manager', 'supervisor'):
             return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
 
-        materiales = self.get_queryset().filter(category__name__icontains='quimic')
+        categories_param = request.query_params.get('categories', '')
+        
+        if not categories_param:
+            return Response({'detail': 'Debe seleccionar al menos una categoría.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            category_ids = [int(cid) for cid in categories_param.split(',') if cid.strip()]
+        except ValueError:
+            return Response({'detail': 'IDs de categorías inválidos.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Filtrar materiales por categorías seleccionadas
+        materiales = self.get_queryset().filter(category_id__in=category_ids)
 
         prepared_by = getattr(request.user, 'get_full_name', None)
         if callable(prepared_by):
@@ -99,12 +109,17 @@ class MaterialViewSet(viewsets.ModelViewSet):
         except Exception as exc:
             return Response({'detail': 'Error generando el reporte: ' + str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # Determine filename by replacing 'TEMPLATE' in template filename with current month
-        tpl_name = os.path.basename(getattr(generate_chemical_inventory_excel, '__template_path__', 'INVENTARIO DE QUIMICO TEMPLATE.xlsx'))
+        # Generar nombre del archivo dinámico
         month = date.today().month
         month_names = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE']
         month_name_text = month_names[month-1]
-        filename = tpl_name.replace('TEMPLATE', month_name_text)
+        
+        if len(category_ids) == 1:
+            categoria = Category.objects.filter(id=category_ids[0]).first()
+            cat_name = categoria.name.upper() if categoria else 'CATEGORIA'
+            filename = f"Inventario_{cat_name}_{month_name_text}.xlsx".replace(" ", "_")
+        else:
+            filename = f"Inventario_Multiple_{month_name_text}.xlsx"
 
         resp = HttpResponse(content, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         resp['Content-Disposition'] = f'attachment; filename="{filename}"'
