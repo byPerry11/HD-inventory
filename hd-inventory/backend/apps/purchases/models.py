@@ -201,6 +201,17 @@ class OrdenCompra(models.Model):
         return None
 
     def save(self, *args, **kwargs):
+        # Limpieza de fechas y campos según el estado actual para evitar inconsistencias
+        if self.status not in ('recibido', 'rem_recibido'):
+            self.fecha_recibido = None
+            self.recibido_por = ''
+        if self.status not in ('ordenado', 'recibido', 'rem_recibido'):
+            self.fecha_ordenado = None
+        if self.status not in ('po_aprobada', 'ordenado', 'recibido', 'rem_recibido'):
+            self.fecha_po_aprobada = None
+        if self.status not in ('pr_aprobada', 'po_aprobada', 'ordenado', 'recibido', 'rem_recibido'):
+            self.fecha_pr_aprobada = None
+
         now = timezone.now()
         today = now.date()
 
