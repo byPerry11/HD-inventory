@@ -51,14 +51,26 @@ class ChangePasswordView(APIView):
 
     def patch(self, request):
         user = request.user
+        current_password = request.data.get('current_password')
         new_password = request.data.get('new_password')
         
-        if not new_password:
-            return Response({'detail': 'Debe proporcionar una nueva contraseña.'}, status=400)
-            
-        if len(new_password) < 8:
-            return Response({'detail': 'La contraseña debe tener al menos 8 caracteres.'}, status=400)
+        if not current_password or not new_password:
+            return Response({'detail': 'Debe proporcionar la contraseña actual y la nueva contraseña.'}, status=400)
 
+        # 1. Validar la contraseña actual
+        if not user.check_password(current_password):
+            return Response({'detail': 'La contraseña actual es incorrecta.'}, status=400)
+
+        # 2. Validar la robustez de la nueva contraseña con las políticas de Django
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError
+        
+        try:
+            validate_password(new_password, user=user)
+        except ValidationError as e:
+            return Response({'detail': e.messages}, status=400)
+
+        # 3. Guardar la nueva contraseña
         user.set_password(new_password)
         user.must_change_password = False
         user.save()

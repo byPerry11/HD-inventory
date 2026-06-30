@@ -51,13 +51,22 @@ class MaterialViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='alertas')
     def alertas(self, request):
         """Retorna materiales en estado 'ordenar' o 'urge'."""
-        materiales = self.get_queryset()
-        alertas = [m for m in materiales if m.estado in ('ordenar', 'urge')]
-        serializer = MaterialListSerializer(alertas, many=True)
+        from django.db.models import F
+        
+        # Filtrar materiales directamente en la base de datos
+        # Estado 'urge': stock_actual <= stock_critico
+        # Estado 'ordenar': stock_actual <= stock_minimo Y stock_actual > stock_critico
+        qs = self.get_queryset()
+        urge_qs = qs.filter(stock_actual__lte=F('stock_critico'))
+        ordenar_qs = qs.filter(stock_actual__lte=F('stock_minimo')).exclude(stock_actual__lte=F('stock_critico'))
+        
+        urge_serializer = MaterialListSerializer(urge_qs, many=True)
+        ordenar_serializer = MaterialListSerializer(ordenar_qs, many=True)
+        
         return Response({
-            'count': len(alertas),
-            'urge': [s for s in serializer.data if s['estado'] == 'urge'],
-            'ordenar': [s for s in serializer.data if s['estado'] == 'ordenar'],
+            'count': len(urge_serializer.data) + len(ordenar_serializer.data),
+            'urge': urge_serializer.data,
+            'ordenar': ordenar_serializer.data,
         })
 
     def perform_destroy(self, instance):

@@ -26,10 +26,15 @@ class CustomUserAdmin(UserAdmin):
         }),
     )
 
-    @admin.action(description='Resetear contraseñas a la default (PeSupplies2026)')
+    @admin.action(description='Resetear contraseñas a una temporal aleatoria')
     def reset_passwords(self, request, queryset):
+        from django.utils.crypto import get_random_string
+        temp_password = get_random_string(12)
         for user in queryset:
-            user.set_password('PeSupplies2026')
+            user.set_password(temp_password)
             user.must_change_password = True
             user.save()
-        self.message_user(request, f"Se ha reseteado la contraseña de {queryset.count()} usuario(s) a 'PeSupplies2026'.")
+        self.message_user(
+            request, 
+            f"Se ha reseteado la contraseña de {queryset.count()} usuario(s). La nueva contraseña temporal es: {temp_password}"
+        )

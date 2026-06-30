@@ -100,11 +100,27 @@ def generate_chemical_inventory_excel(materials_qs, template_path=None, prepared
     if year is None:
         year = today.year
 
-    # We'll write three rows por material: Entrada, Salida, Stock
-    r = start_row
-
     # import here to avoid circular imports at module load
     from apps.inventory.models import Entrada, Salida
+    from collections import defaultdict
+
+    # Pre-cargar entradas y salidas en lote para evitar N+1 queries
+    # Si materials_qs es un queryset evaluado o lista, extraemos IDs
+    material_ids = [m.id for m in materials_qs]
+    
+    todas_entradas = Entrada.objects.filter(material_id__in=material_ids, fecha__year=year)
+    todas_salidas = Salida.objects.filter(material_id__in=material_ids, fecha__year=year)
+
+    entradas_por_material = defaultdict(list)
+    for e in todas_entradas:
+        entradas_por_material[e.material_id].append(e)
+
+    salidas_por_material = defaultdict(list)
+    for s in todas_salidas:
+        salidas_por_material[s.material_id].append(s)
+
+    # We'll write three rows por material: Entrada, Salida, Stock
+    r = start_row
 
     for m in materials_qs:
         col_code = col_map.get('# HDS') or col_map.get('#HDS') or list(col_map.values())[0]
@@ -120,15 +136,15 @@ def generate_chemical_inventory_excel(materials_qs, template_path=None, prepared
             ws.cell(row=r, column=col_unit, value=m.unit)
 
         # Calculate monthly entradas/salidas for the given year
-        entradas = Entrada.objects.filter(material=m, fecha__year=year)
-        salidas = Salida.objects.filter(material=m, fecha__year=year)
+        entradas_m = entradas_por_material.get(m.id, [])
+        salidas_m = salidas_por_material.get(m.id, [])
 
         entradas_by_month = {i: 0 for i in range(1,13)}
         salidas_by_month = {i: 0 for i in range(1,13)}
 
-        for e in entradas:
+        for e in entradas_m:
             entradas_by_month[e.fecha.month] += e.cantidad
-        for s in salidas:
+        for s in salidas_m:
             salidas_by_month[s.fecha.month] += s.cantidad
 
         # Row Entrada

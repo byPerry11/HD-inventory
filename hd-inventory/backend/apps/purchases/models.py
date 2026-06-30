@@ -183,9 +183,22 @@ class OrdenCompra(models.Model):
 
     # ─── Rastreo de cambios ───────────────────────────────────
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.__old_status = self.status
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._loaded_values = dict(zip(field_names, values))
+        return instance
+
+    def refresh_from_db(self, db=None, fields=None):
+        super().refresh_from_db(db, fields)
+        if hasattr(self, '_loaded_values'):
+            for field in fields or self._loaded_values.keys():
+                self._loaded_values[field] = getattr(self, field)
+        else:
+            self._loaded_values = {
+                field: getattr(self, field)
+                for field in (fields or [f.name for f in self._meta.fields])
+            }
 
     # ─── Lógica de negocio ────────────────────────────────────
 
@@ -206,7 +219,8 @@ class OrdenCompra(models.Model):
 
         # Si es nueva, o cambió el status, capturamos fechas
         is_new = self.pk is None
-        status_changed = is_new or (self.status != self.__old_status)
+        old_status = getattr(self, '_loaded_values', {}).get('status', self.status)
+        status_changed = is_new or (self.status != old_status)
 
         if status_changed:
             if self.status in ('pr_creada', 'pedido_rem') and not self.fecha_pr:
@@ -223,10 +237,41 @@ class OrdenCompra(models.Model):
         super().save(*args, **kwargs)
 
         # Actualizar stock DESPUÉS de guardar, solo en la transición → recibido / rem_recibido
-        if self.status in ('recibido', 'rem_recibido') and self.__old_status not in ('recibido', 'rem_recibido'):
-            self._material_creado_inactivo = self._actualizar_stock()
+        was_received = old_status in ('recibido', 'rem_recibido') and not is_new
+        is_received = self.status in ('recibido', 'rem_recibido')
 
-        self.__old_status = self.status
+        if is_received and not was_received:
+            self._material_creado_inactivo = self._actualizar_stock()
+        elif was_received and not is_received:
+            self._revertir_stock()
+
+        # Actualizar los valores cargados en memoria
+        if hasattr(self, '_loaded_values'):
+            self._loaded_values['status'] = self.status
+        else:
+            self._loaded_values = {'status': self.status}
+
+    def _revertir_stock(self):
+        """
+        Resta la cantidad al stock del material vinculado y elimina la Entrada de trazabilidad correspondiente.
+        """
+        if self.material:
+            from django.db.models import F
+            from django.db import transaction
+            from apps.inventory.models import Entrada
+
+            with transaction.atomic():
+                material = self.material
+                material.stock_actual = F('stock_actual') - self.cantidad
+                material.save(update_fields=['stock_actual', 'actualizado_en'])
+                material.refresh_from_db(fields=['stock_actual'])
+
+                # Eliminar la Entrada de trazabilidad asociada
+                Entrada.objects.filter(
+                    material=material,
+                    cantidad=self.cantidad,
+                    numero_orden=self.po_number or f'OC-{self.pk}'
+                ).delete()
 
     def _actualizar_stock(self) -> bool:
         """

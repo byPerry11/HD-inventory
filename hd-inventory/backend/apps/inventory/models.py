@@ -100,10 +100,22 @@ class Entrada(models.Model):
         verbose_name='Registrado por',
     )
 
-    class Meta:
-        verbose_name = 'Entrada'
-        verbose_name_plural = 'Entradas'
-        ordering = ['-fecha']
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._loaded_values = dict(zip(field_names, values))
+        return instance
+
+    def refresh_from_db(self, db=None, fields=None):
+        super().refresh_from_db(db, fields)
+        if hasattr(self, '_loaded_values'):
+            for field in fields or self._loaded_values.keys():
+                self._loaded_values[field] = getattr(self, field)
+        else:
+            self._loaded_values = {
+                field: getattr(self, field)
+                for field in (fields or [f.name for f in self._meta.fields])
+            }
 
     def __str__(self):
         return f"Entrada #{self.pk} — {self.material.code} x{self.cantidad}"
@@ -177,6 +189,23 @@ class Salida(models.Model):
         verbose_name_plural = 'Salidas'
         ordering = ['-fecha']
 
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._loaded_values = dict(zip(field_names, values))
+        return instance
+
+    def refresh_from_db(self, db=None, fields=None):
+        super().refresh_from_db(db, fields)
+        if hasattr(self, '_loaded_values'):
+            for field in fields or self._loaded_values.keys():
+                self._loaded_values[field] = getattr(self, field)
+        else:
+            self._loaded_values = {
+                field: getattr(self, field)
+                for field in (fields or [f.name for f in self._meta.fields])
+            }
+
     def __str__(self):
         return f"Salida #{self.pk} — {self.material.code} x{self.cantidad} → {self.linea}"
 
@@ -239,10 +268,22 @@ class Vale(models.Model):
         verbose_name='Capturado por',
     )
 
-    class Meta:
-        verbose_name = 'Vale'
-        verbose_name_plural = 'Vales'
-        ordering = ['-fecha']
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._loaded_values = dict(zip(field_names, values))
+        return instance
+
+    def refresh_from_db(self, db=None, fields=None):
+        super().refresh_from_db(db, fields)
+        if hasattr(self, '_loaded_values'):
+            for field in fields or self._loaded_values.keys():
+                self._loaded_values[field] = getattr(self, field)
+        else:
+            self._loaded_values = {
+                field: getattr(self, field)
+                for field in (fields or [f.name for f in self._meta.fields])
+            }
 
     def __str__(self):
         return f"Vale #{self.recibo_no or self.pk} — {self.material.code} x{self.cantidad}"
