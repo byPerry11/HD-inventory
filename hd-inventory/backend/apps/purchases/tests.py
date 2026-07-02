@@ -106,6 +106,28 @@ class OrdenCompraTest(TestCase):
         self.assertIsNotNone(oc.fecha_pr_aprobada)
         self.assertIsNotNone(oc.fecha_po_aprobada)
 
+    def test_tiempo_entrega_dias(self):
+        """Verifica que el cálculo de tiempo_entrega_dias no lance TypeError y calcule los días correctos."""
+        import datetime
+        oc = OrdenCompra(
+            no_parte='MAT-TEST-01',
+            descripcion='Material de Prueba',
+            cantidad=5,
+            costo_unitario=10.0,
+            moneda='MXN',
+            proveedor_ref=self.provider,
+            material=self.material,
+            creado_por=self.user,
+            status='recibido'
+        )
+        # Asignar fechas como datetime
+        now = timezone.now()
+        oc.fecha_po_aprobada = now - datetime.timedelta(days=5)
+        oc.fecha_recibido = now
+        
+        # Debe calcular 5 días
+        self.assertEqual(oc.tiempo_entrega_dias, 5)
+
     def assertNilDates(self, instance, field_names):
         for name in field_names:
             self.assertIsNone(getattr(instance, name), f"El campo {name} debería ser None")

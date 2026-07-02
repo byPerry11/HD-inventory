@@ -177,8 +177,10 @@ class OrdenCompra(models.Model):
     def tiempo_entrega_dias(self):
         """Días transcurridos desde PO aprobada hasta recibido."""
         if self.fecha_po_aprobada and self.fecha_recibido:
-            # fecha_po_aprobada es DateTime, fecha_recibido es Date
-            return (self.fecha_recibido - self.fecha_po_aprobada.date()).days
+            # Ambos son DateTimeField, convertimos ambos a date antes de restar
+            d_recibido = self.fecha_recibido.date() if hasattr(self.fecha_recibido, 'date') else self.fecha_recibido
+            d_po = self.fecha_po_aprobada.date() if hasattr(self.fecha_po_aprobada, 'date') else self.fecha_po_aprobada
+            return (d_recibido - d_po).days
         return None
 
     # ─── Rastreo de cambios ───────────────────────────────────

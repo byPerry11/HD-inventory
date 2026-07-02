@@ -34,7 +34,7 @@ LINEA_CHOICES = [
 
 class Linea(models.Model):
     """
-    Catálogo de líneas (anteriormente áreas) administrable.
+    Catálogo de líneas administrable.
     """
     nombre = models.CharField(max_length=100, unique=True, verbose_name="Nombre de la Línea")
 
@@ -49,7 +49,7 @@ class Linea(models.Model):
 
 class Area(models.Model):
     """
-    Catálogo de áreas (anteriormente secciones) administrable por supervisores/managers.
+    Catálogo de áreas administrable por supervisores/managers.
     Cada área pertenece a una línea.
     """
     nombre = models.CharField(max_length=100, verbose_name="Nombre del Área")
