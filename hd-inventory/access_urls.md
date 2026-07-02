@@ -2,7 +2,7 @@
 
 > **Host:** `MXTJSF225` · **IP LAN:** `192.168.10.163` · **Dominio:** `mxtjsf225.tpvaoc.com`
 
-## Enlaces de Acceso
+## Enlaces de Accesoo
 
 | Servicio | URL Local (desde este PC) | URL LAN por Dominio | URL LAN por IP | Puerto |
 | :--- | :--- | :--- | :--- | :---: |

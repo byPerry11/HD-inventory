@@ -1,0 +1,7 @@
+**/hdinvetory
+**/node_modules
+**/.git
+**/.next
+**/dist
+**/.gemini
+**/db.sqlite3
