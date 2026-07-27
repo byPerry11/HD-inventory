@@ -1,0 +1,197 @@
+.vales-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.vales-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+
+.vales-filters .filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vales-filters .filter-group input,
+.vales-filters .filter-group select {
+  width: 160px;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  height: 30px;
+}
+
+.vales-filters .filter-group input[type="datetime-local"] {
+  width: 200px;
+}
+
+.vales-filters .filter-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.vales-filters .filter-actions {
+  display: flex;
+  gap: var(--space-1);
+  align-items: flex-end;
+  padding-bottom: 1px;
+}
+
+.vales-filters .filter-actions .btn {
+  font-size: 0.8rem;
+  padding: 4px 12px;
+  height: 30px;
+}
+
+/* Expandable row */
+.vale-row {
+  cursor: pointer;
+}
+
+.vale-row td {
+  transition: background 0.15s;
+}
+
+.vale-row:hover td {
+  background: var(--surface-hover);
+}
+
+.vale-detail-row td {
+  padding: 0 !important;
+}
+
+.vale-detail {
+  padding: var(--space-4);
+  background: var(--surface-hover);
+  border-bottom: 1px solid var(--border);
+}
+
+.vale-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.vale-detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vale-detail-field .detail-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.vale-detail-field .detail-value {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+/* Signature checkboxes */
+.signature-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.signature-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.signature-item label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+.signature-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #3fb950;
+  cursor: pointer;
+}
+
+.signature-item .signature-status {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.signature-item.signed {
+  border-color: #3fb950;
+  background: rgba(63, 185, 80, 0.08);
+}
+
+.signature-item.pending {
+  border-color: var(--border);
+}
+
+.detail-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+/* Pagination */
+.vales-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  margin-top: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.vales-pagination .pagination-info {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.vales-pagination .pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.pagination-count-badge {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  background: var(--surface-hover);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.vale-detail-field .form-control {
+  width: 100%;
+}

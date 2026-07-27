@@ -133,6 +133,7 @@ class ValeSerializer(serializers.ModelSerializer):
             'area', 'area_nombre', 'salida',
             'fecha', 'material', 'material_info', 'aut', 'cantidad', 'costo', 'observaciones',
             'registrado_por', 'registrado_por_nombre',
+            'firma_supervisor', 'firma_gerente', 'firma_empleado', 'firma_entrega',
         ]
         read_only_fields = [
             'id', 'fecha', 'registrado_por', 'material_info', 

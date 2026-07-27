@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.filters import OrderingFilter
+from rest_framework.filters import OrderingFilter, SearchFilter
 from django.utils import timezone
 from datetime import timedelta
 
@@ -13,6 +13,8 @@ from .serializers import (
     EntradaSerializer, SalidaSerializer, AreaSerializer, 
     ValeSerializer, EmpleadoSerializer, LineaSerializer
 )
+from .filters import SalidaFilter, EntradaFilter
+from apps.accounts.permissions import IsSupervisorOrAboveOrReadOnly
 
 
 class AreaViewSet(viewsets.ModelViewSet):
@@ -63,19 +65,19 @@ class EntradaViewSet(viewsets.ModelViewSet):
     """
     Registro de entradas de material al almacén.
     Todos los usuarios autenticados pueden crear entradas.
-    Solo managers pueden eliminar.
+    Solo managers/supervisors pueden eliminar.
     """
     queryset = Entrada.objects.select_related('material', 'registrado_por').order_by('-fecha')
     serializer_class = EntradaSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_fields = ['material', 'registrado_por']
+    filterset_class = EntradaFilter
     ordering_fields = ['fecha', 'cantidad']
 
     def destroy(self, request, *args, **kwargs):
-        if request.user.role != 'manager':
+        if request.user.role not in ('manager', 'supervisor'):
             return Response(
-                {'detail': 'Solo los managers pueden eliminar registros.'},
+                {'detail': 'Solo managers o supervisores pueden eliminar registros.'},
                 status=status.HTTP_403_FORBIDDEN
             )
         return super().destroy(request, *args, **kwargs)
@@ -90,13 +92,13 @@ class SalidaViewSet(viewsets.ModelViewSet):
     serializer_class = SalidaSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_fields = ['material', 'linea', 'area', 'turno', 'registrado_por']
+    filterset_class = SalidaFilter
     ordering_fields = ['fecha', 'cantidad', 'linea']
 
     def destroy(self, request, *args, **kwargs):
-        if request.user.role != 'manager':
+        if request.user.role not in ('manager', 'supervisor'):
             return Response(
-                {'detail': 'Solo los managers pueden eliminar registros.'},
+                {'detail': 'Solo managers o supervisores pueden eliminar registros.'},
                 status=status.HTTP_403_FORBIDDEN
             )
         return super().destroy(request, *args, **kwargs)
@@ -154,16 +156,19 @@ class SalidaViewSet(viewsets.ModelViewSet):
 class ValeViewSet(viewsets.ModelViewSet):
     """
     Gestión de Vales (comprobantes de salida basados en recibo).
+    Lectura: cualquier autenticado.
+    Escritura/Borrado: solo supervisores y managers.
     """
     queryset = Vale.objects.select_related('material', 'registrado_por', 'linea', 'area').order_by('-fecha')
     serializer_class = ValeSerializer
-    permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    permission_classes = [IsAuthenticated, IsSupervisorOrAboveOrReadOnly]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['material', 'registrado_por', 'recibo_no', 'linea', 'area']
+    search_fields = ['recibo_no', 'empleado_no', 'empleado_nombre', 'material__code', 'material__name']
     ordering_fields = ['fecha', 'recibo_no']
 
     def destroy(self, request, *args, **kwargs):
-        if request.user.role != 'manager':
-            return Response({'detail': 'Solo los managers pueden eliminar registros.'}, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role not in ('manager', 'supervisor'):
+            return Response({'detail': 'Solo supervisores o managers pueden eliminar vales.'}, status=status.HTTP_403_FORBIDDEN)
         return super().destroy(request, *args, **kwargs)
 

@@ -72,11 +72,11 @@ export default function App() {
                 <Route path="entradas"   element={<Entradas />} />
                 <Route path="vales"      element={<Vales />} />
                 <Route path="materiales" element={<Materiales />} />
+                <Route path="historial"  element={<Historial />} />
                 <Route path="ajustes"    element={<Ajustes />} />
 
                 {/* Rutas Admin/Supervisor */}
                 <Route path="dashboard"   element={<RoleRoute allowedRoles={['manager', 'supervisor']}><Dashboard /></RoleRoute>} />
-                <Route path="historial"   element={<RoleRoute allowedRoles={['manager', 'supervisor']}><Historial /></RoleRoute>} />
                 <Route path="ordenes"     element={<RoleRoute allowedRoles={['manager', 'supervisor', 'capturista']}><OrdenesCompra /></RoleRoute>} />
                 <Route path="categorias"  element={<RoleRoute allowedRoles={['manager', 'supervisor']}><Categorias /></RoleRoute>} />
                 <Route path="proveedores" element={<RoleRoute allowedRoles={['manager', 'supervisor']}><Proveedores /></RoleRoute>} />

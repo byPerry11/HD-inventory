@@ -1,26 +1,43 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import api from '../../api/client'
 import { cleanBadgeID } from '../../utils/formatters'
-import { printVale } from '../../utils/printUtils'
+import { useToast } from '../../context/ToastContext'
 
 export default function ValeModal({ open, onClose, preselectedMaterial }) {
+  const notify = useToast()
   const EMPTY = {
     empleado_no: '', empleado_nombre: '', linea: '', area: '', material: '', aut: '', cantidad: '', costo: '', observaciones: ''
   }
   const [form, setForm] = useState(EMPTY)
-  const [materiales, setMateriales] = useState([])
+  const [searchResults, setSearchResults] = useState([])
+  const [searching, setSearching] = useState(false)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(false)
   const [choices, setChoices] = useState({ lineas: [], areas: [], turnos: [] })
   const [filteredAreas, setFilteredAreas] = useState([])
+  const searchTimer = useRef(null)
 
   useEffect(() => { 
     if (open) {
-      fetchMateriales()
       fetchChoices()
+      fetchMaterials('')
     }
   }, [open])
+
+  const fetchMaterials = async (q) => {
+    setSearching(true)
+    try {
+      const params = q ? `?search=${encodeURIComponent(q)}&page_size=20` : '?page_size=20'
+      const { data } = await api.get(`/materials/${params}`)
+      setSearchResults(data.results || data)
+    } catch (e) { /* ignore */ } finally { setSearching(false) }
+  }
+
+  const doSearch = (q) => {
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    searchTimer.current = setTimeout(() => fetchMaterials(q), 300)
+  }
 
   const fetchChoices = async () => {
     try {
@@ -50,21 +67,11 @@ export default function ValeModal({ open, onClose, preselectedMaterial }) {
     }
   }, [preselectedMaterial])
 
-  const fetchMateriales = async () => {
-    try {
-      const { data } = await api.get('/materials/?page_size=500')
-      setMateriales(data.results || data)
-    } catch (e) { /* ignore */ }
-  }
-
-  const filtered = materiales.filter(m =>
-    m.name.toLowerCase().includes(search.toLowerCase()) || m.code.toLowerCase().includes(search.toLowerCase())
-  )
-
   const handleSelect = (m) => {
     setSelected(m)
     setForm(f => ({ ...f, material: m.id, aut: m.aut || '', costo: m.costo || 0 }))
     setSearch(m.code + ' — ' + m.name)
+    setSearchResults([])
   }
 
   const handleChange = (e) => {
@@ -99,12 +106,11 @@ export default function ValeModal({ open, onClose, preselectedMaterial }) {
     e.preventDefault()
     setLoading(true)
     try {
-      const { data } = await api.post('/inventory/vales/', form)
-      // Imprimir con los datos reales que vienen de DB (incluyendo recibo_no)
-      printVale(data)
+      await api.post('/inventory/vales/', form)
+      notify.success('Vale creado correctamente')
       onClose(true)
     } catch (err) {
-      alert('Error creando el vale')
+      notify.error('Error creando el vale')
     } finally { setLoading(false) }
   }
 
@@ -156,11 +162,11 @@ export default function ValeModal({ open, onClose, preselectedMaterial }) {
                 className="form-control"
                 placeholder="Código o nombre..."
                 value={search} 
-                onChange={e => { setSearch(e.target.value); setSelected(null); setForm(f => ({...f, material: ''})) }} 
+                onChange={e => { const v = e.target.value; setSearch(v); setSelected(null); setForm(f => ({...f, material: ''})); doSearch(v) }} 
               />
-              {search && !selected && filtered.length > 0 && (
+              {!selected && searchResults.length > 0 && (
                 <ul className="material-dropdown">
-                  {filtered.slice(0, 8).map(m => (
+                  {searchResults.slice(0, 10).map(m => (
                     <li key={m.id} className="material-option" onClick={() => handleSelect(m)}>
                       <span className="font-mono">{m.code}</span>
                       <span className="text-muted"> — {m.name}</span>
@@ -260,12 +266,7 @@ export default function ValeModal({ open, onClose, preselectedMaterial }) {
               className="btn btn-primary" 
               disabled={loading || !form.material}
             >
-              {loading ? 'Generando...' : (
-                <span className="flex-center gap-2">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-                  Crear e Imprimir
-                </span>
-              )}
+              {loading ? 'Guardando...' : 'Crear Vale'}
             </button>
           </div>
         </form>

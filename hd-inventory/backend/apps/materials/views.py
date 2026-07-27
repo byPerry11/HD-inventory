@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 
-from apps.accounts.permissions import IsManagerOrReadOnly, IsSupervisorOrAboveOrReadOnly
+from apps.accounts.permissions import IsManagerOrReadOnly, IsSupervisorOrAboveOrReadOnly, IsCapturistaOrAboveOrReadOnly
 from .models import Material, Category
 from .serializers import MaterialSerializer, MaterialListSerializer, CategorySerializer
 from .filters import MaterialFilter
@@ -29,7 +29,7 @@ class MaterialViewSet(viewsets.ModelViewSet):
     - POST/PUT/PATCH/DELETE: solo managers / supervisors
     """
     queryset = Material.objects.select_related('category').filter(activo=True)
-    permission_classes = [IsSupervisorOrAboveOrReadOnly]
+    permission_classes = [IsCapturistaOrAboveOrReadOnly]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = MaterialFilter
     search_fields = ['code', 'name', 'descripcion']

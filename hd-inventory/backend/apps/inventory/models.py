@@ -231,6 +231,12 @@ class Vale(models.Model):
     costo = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Costo')
     observaciones = models.TextField(blank=True, verbose_name='Observaciones')
 
+    # ─── Firmas digitales ──────────────────────────────────────
+    firma_supervisor = models.BooleanField(default=False, verbose_name='Firma Supervisor')
+    firma_gerente    = models.BooleanField(default=False, verbose_name='Firma Gerente')
+    firma_empleado   = models.BooleanField(default=False, verbose_name='Firma Empleado')
+    firma_entrega    = models.BooleanField(default=False, verbose_name='Firma Quien Entrega')
+
     registrado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

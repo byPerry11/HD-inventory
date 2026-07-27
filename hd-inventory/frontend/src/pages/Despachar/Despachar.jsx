@@ -27,7 +27,7 @@ export default function Despachar() {
   const [filteredAreas, setFilteredAreas] = useState([]) // Áreas filtradas por línea
 
   // Formularios con persistencia
-  const [config, setConfig] = usePersistentState('hd_despachar_config', { linea: '', area: '', turno: '', empleado_no: '', recibio: '', observaciones: '' }, 'session')
+  const [config, setConfig] = usePersistentState('hd_despachar_config', { linea: '', area: '', turno: '', empleado_no: '', recibio: '', observaciones: '' }, 'local')
 
   useEffect(() => {
     fetchData()
@@ -80,7 +80,7 @@ export default function Despachar() {
   const fetchData = async () => {
     try {
       const [matRes, optsRes, catRes] = await Promise.all([
-        client.get('/materials/?page_size=1000'),
+        client.get('/materials/?page_size=2000'),
         client.get('/inventory/salidas/choices/'),
         client.get('/materials/categorias/'),
       ])
@@ -205,10 +205,18 @@ export default function Despachar() {
   }
 
   const setExactCartQty = (id, value) => {
-    const val = parseInt(value) || 1
+    if (value === '' || value === '0') {
+      setCart(prev => prev.map(item => {
+        if (item.material.id === id) return { ...item, cantidad: '' }
+        return item
+      }))
+      return
+    }
+    const num = parseInt(value, 10)
+    if (isNaN(num) || num < 1) return
     setCart(prev => prev.map(item => {
       if (item.material.id === id) {
-        const newQty = Math.max(1, Math.min(val, item.material.stock_actual))
+        const newQty = Math.min(num, item.material.stock_actual)
         return { ...item, cantidad: newQty }
       }
       return item
@@ -226,10 +234,19 @@ export default function Despachar() {
       return
     }
 
+    // Validar cantidades antes de enviar
+    for (const item of cart) {
+      if (!item.cantidad || item.cantidad < 1) {
+        notify.warning(`Cantidad inválida para ${item.material.code}`)
+        setLoading(false)
+        return
+      }
+    }
+
     setLoading(true)
     try {
       const payload = {
-        items: cart.map(i => ({ material: i.material.id, cantidad: i.cantidad, observaciones: i.observaciones })),
+        items: cart.map(i => ({ material: i.material.id, cantidad: Number(i.cantidad), observaciones: i.observaciones })),
         linea: config.linea,
         area: config.area || null,
         turno: config.turno,
