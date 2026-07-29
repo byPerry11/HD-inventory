@@ -1,6 +1,6 @@
 """inventory/admin.py"""
 from django.contrib import admin
-from .models import Entrada, Salida, Area, Linea, Vale, Empleado
+from .models import Entrada, Salida, Area, Linea, Vale, ValeItem, Empleado
 
 
 @admin.register(Entrada)
@@ -52,6 +52,13 @@ class ValeAdmin(admin.ModelAdmin):
     list_filter = ('linea', 'fecha')
     search_fields = ('empleado_no', 'empleado_nombre', 'recibo_no', 'material__code')
     readonly_fields = ('fecha', 'registrado_por', 'recibo_no')
+
+
+@admin.register(ValeItem)
+class ValeItemAdmin(admin.ModelAdmin):
+    list_display = ('id', 'vale', 'material', 'cantidad', 'costo')
+    search_fields = ('material__code', 'material__name')
+    list_filter = ('vale__fecha',)
 
 
 @admin.register(Empleado)

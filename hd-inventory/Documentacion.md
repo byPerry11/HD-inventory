@@ -20,7 +20,7 @@ Antes de la implementación de HD-Inventory, la gestión del almacén presentaba
 
 ## 4. Tecnologías Usadas
 ### Frontend (Cliente)
-- **Framework**: React.js 18
+- **Framework**: React.js 18.0
 - **Construcción**: Vite
 - **Estilos**: Vanilla CSS con variables nativas (Design Tokens) y SVG en línea.
 - **Llamadas a API**: Axios

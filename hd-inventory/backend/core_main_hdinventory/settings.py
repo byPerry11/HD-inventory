@@ -99,6 +99,15 @@ DATABASES = {
     }
 }
 
+import sys
+if 'test' in sys.argv:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
+        }
+    }
+
 # ─── Modelo de usuario personalizado ─────────────────────────
 AUTH_USER_MODEL = 'accounts.User'
 
@@ -109,6 +118,9 @@ PASSWORD_HASHERS = [
     'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
     'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
 ]
+
+# Contraseña temporal por defecto para nuevos usuarios
+DEFAULT_TEMPORARY_PASSWORD = config('DEFAULT_TEMPORARY_PASSWORD', default='Cambiar2026!')
 
 # ─── Validación de contraseñas ────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [

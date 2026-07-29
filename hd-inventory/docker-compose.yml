@@ -26,6 +26,11 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # ─── Backend Django ─────────────────────────────────────────
   backend:
@@ -40,13 +45,21 @@ services:
       - DB_HOST=db
     volumes:
       - ./backend:/app
-      - ./media:/app/media          # bind-mount local: las imágenes persisten siempre
+      - ./media:/app/media
       - static_volume:/app/staticfiles
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 5
     command: >
       sh -c "python manage.py collectstatic --noinput &&
              python manage.py migrate --noinput &&
@@ -67,7 +80,8 @@ services:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
-      - backend
+      backend:
+        condition: service_started
 
   # ─── Servidor Web NGINX (Proxy Inverso + Frontend Prod) ─────
   nginx:
@@ -83,7 +97,8 @@ services:
       - static_volume:/app/staticfiles:ro
       - ./media:/app/media:ro
     depends_on:
-      - backend
+      backend:
+        condition: service_started
 
 
 

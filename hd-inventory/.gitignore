@@ -56,19 +56,20 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Docker
-.docker/
-docker-compose.yml
-docker-compose.override.yml
-Dockerfile
-
 # OS
 .DS_Store
 Thumbs.db
 *.swp
 *~
+*.bak
 
 # IDE
 .vscode/settings.json
 .idea/
 *.iml
+
+# Backups / archivos externos
+respaldo de inventario para cargar/
+*.xlsm
+*.xlsx
+!frontend/src/**/*.xlsx

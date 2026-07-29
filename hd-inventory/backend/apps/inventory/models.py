@@ -3,6 +3,7 @@ App: inventory — Modelos de Entradas y Salidas
 Los signals actualizan el stock_actual del material automáticamente.
 """
 from django.db import models
+from django.utils import timezone
 from django.conf import settings
 from apps.materials.models import Material
 
@@ -34,7 +35,7 @@ LINEA_CHOICES = [
 
 class Linea(models.Model):
     """
-    Catálogo de líneas (anteriormente áreas) administrable.
+    Catálogo de líneas administrable.
     """
     nombre = models.CharField(max_length=100, unique=True, verbose_name="Nombre de la Línea")
 
@@ -49,7 +50,7 @@ class Linea(models.Model):
 
 class Area(models.Model):
     """
-    Catálogo de áreas (anteriormente secciones) administrable por supervisores/managers.
+    Catálogo de áreas administrable por supervisores/managers.
     Cada área pertenece a una línea.
     """
     nombre = models.CharField(max_length=100, verbose_name="Nombre del Área")
@@ -210,6 +211,30 @@ class Salida(models.Model):
         return f"Salida #{self.pk} — {self.material.code} x{self.cantidad} → {self.linea}"
 
 
+class ValeItem(models.Model):
+    """Artículo individual dentro de un Vale (soporta múltiples materiales)."""
+    vale = models.ForeignKey(
+        'Vale',
+        on_delete=models.CASCADE,
+        related_name='items',
+        verbose_name='Vale'
+    )
+    material = models.ForeignKey(
+        Material,
+        on_delete=models.PROTECT,
+        verbose_name='Material'
+    )
+    cantidad = models.PositiveIntegerField(verbose_name='Cantidad')
+    costo = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Costo')
+
+    class Meta:
+        verbose_name = 'Artículo de Vale'
+        verbose_name_plural = 'Artículos de Vales'
+
+    def __str__(self):
+        return f"{self.material.code} x{self.cantidad}"
+
+
 class Vale(models.Model):
     """
     Vale / Comprobante de salida basado en un recibo.
@@ -246,19 +271,30 @@ class Vale(models.Model):
         related_name='vales',
         verbose_name='Área'
     )
-    fecha = models.DateTimeField(auto_now_add=True, verbose_name='Fecha')
+    fecha = models.DateTimeField(default=timezone.now, verbose_name='Fecha')
 
-    # Referencia al material (número de parte)
+    # Referencia al material (número de parte) — legacy, usar items en adelante
     material = models.ForeignKey(
         Material,
         on_delete=models.PROTECT,
+        null=True, blank=True,
         related_name='vales',
-        verbose_name='Material (Parte)'
+        verbose_name='Material (Parte) — legacy'
     )
     aut = models.CharField(max_length=200, blank=True, verbose_name='Aut')
-    cantidad = models.PositiveIntegerField(verbose_name='Cantidad')
-    costo = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Costo')
+    cantidad = models.PositiveIntegerField(null=True, blank=True, verbose_name='Cantidad — legacy')
+    costo = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name='Costo — legacy')
     observaciones = models.TextField(blank=True, verbose_name='Observaciones')
+
+    # ─── Firmas digitales ──────────────────────────────────────
+    firma_supervisor       = models.BooleanField(default=False, verbose_name='Firma Supervisor')
+    firma_supervisor_nombre = models.CharField(max_length=255, blank=True, verbose_name='Nombre Supervisor')
+    firma_gerente          = models.BooleanField(default=False, verbose_name='Firma Gerente')
+    firma_gerente_nombre   = models.CharField(max_length=255, blank=True, verbose_name='Nombre Gerente')
+    firma_empleado         = models.BooleanField(default=False, verbose_name='Firma Empleado')
+    firma_empleado_nombre  = models.CharField(max_length=255, blank=True, verbose_name='Nombre Empleado')
+    firma_entrega          = models.BooleanField(default=False, verbose_name='Firma Quien Entrega')
+    firma_entrega_nombre   = models.CharField(max_length=255, blank=True, verbose_name='Nombre Quien Entrega')
 
     registrado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -286,10 +322,14 @@ class Vale(models.Model):
             }
 
     def __str__(self):
-        return f"Vale #{self.recibo_no or self.pk} — {self.material.code} x{self.cantidad}"
+        items_count = self.items.count()
+        if items_count > 0:
+            return f"Vale #{self.recibo_no or self.pk} — {items_count} artículo(s)"
+        if self.material:
+            return f"Vale #{self.recibo_no or self.pk} — {self.material.code} x{self.cantidad}"
+        return f"Vale #{self.recibo_no or self.pk}"
 
     def save(self, *args, **kwargs):
-        # Asigna recibo_no auto-incremental si no se proporciona
         if not self.recibo_no:
             last = Vale.objects.order_by('-recibo_no').first()
             self.recibo_no = (last.recibo_no if last and last.recibo_no else 0) + 1

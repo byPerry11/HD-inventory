@@ -527,7 +527,10 @@ export default function OrdenesCompra() {
                   <input 
                     type="number" className="input-text" min="1" required
                     value={newOc.cantidad}
-                    onChange={e => setNewOc({...newOc, cantidad: parseInt(e.target.value) || 1})}
+                    onChange={e => {
+                      const v = e.target.value
+                      setNewOc({...newOc, cantidad: v === '' ? '' : (parseInt(v) || 1)})
+                    }}
                   />
                 </div>
                 <div className="form-group" style={{ flex: 1 }}>
@@ -536,7 +539,10 @@ export default function OrdenesCompra() {
                     <input 
                       type="number" className="input-text" min="0" step="0.0001" required
                       value={newOc.costo_unitario} style={{ flex: 1 }}
-                      onChange={e => setNewOc({...newOc, costo_unitario: parseFloat(e.target.value) || 0})}
+                      onChange={e => {
+                        const v = e.target.value
+                        setNewOc({...newOc, costo_unitario: v === '' ? '' : (parseFloat(v) || 0)})
+                      }}
                     />
                     <select 
                       className="input-select" value={newOc.moneda}

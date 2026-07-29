@@ -8,10 +8,11 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Instalar dependencias del sistema (psycopg2 necesita libpq)
+# Instalar dependencias del sistema
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     gcc \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Instalar dependencias de Python
@@ -21,4 +22,11 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 # Copiar código fuente
 COPY . .
 
+# Crear directorio para archivos estáticos (collectstatic)
+RUN mkdir -p /app/staticfiles
+
 EXPOSE 8000
+
+# Healthcheck — verifica que el servidor responde
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl --fail http://localhost:8000/health/ || exit 1
