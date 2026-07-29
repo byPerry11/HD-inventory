@@ -15,10 +15,10 @@ const EMPTY_FILTERS = {
 }
 
 const FIRMAS = [
-  { key: 'firma_supervisor', label: 'Supervisor' },
-  { key: 'firma_gerente', label: 'Gerente' },
-  { key: 'firma_empleado', label: 'Empleado' },
-  { key: 'firma_entrega', label: 'Quien Entrega' },
+  { key: 'firma_supervisor', label: 'Supervisor', nameKey: 'firma_supervisor_nombre' },
+  { key: 'firma_gerente', label: 'Gerente', nameKey: 'firma_gerente_nombre' },
+  { key: 'firma_empleado', label: 'Empleado', nameKey: 'firma_empleado_nombre' },
+  { key: 'firma_entrega', label: 'Quien Entrega', nameKey: 'firma_entrega_nombre' },
 ]
 
 export default function Vales() {
@@ -69,21 +69,33 @@ export default function Vales() {
   }
 
   const toggleExpand = (id) => {
+    if (editId === id) {
+      setEditId(null)
+      setEditForm({})
+    }
     setExpandedId(expandedId === id ? null : id)
-    setEditId(null)
-    setEditForm({})
   }
 
   const startEdit = (vale) => {
     setEditId(vale.id)
     setEditForm({
-      cantidad: vale.cantidad,
+      recibo_no: vale.recibo_no || '',
+      fecha: vale.fecha ? new Date(vale.fecha).toISOString().slice(0, 16) : '',
       observaciones: vale.observaciones,
       firma_supervisor: vale.firma_supervisor,
+      firma_supervisor_nombre: vale.firma_supervisor_nombre || '',
       firma_gerente: vale.firma_gerente,
+      firma_gerente_nombre: vale.firma_gerente_nombre || '',
       firma_empleado: vale.firma_empleado,
+      firma_empleado_nombre: vale.firma_empleado_nombre || vale.empleado_nombre || '',
       firma_entrega: vale.firma_entrega,
+      firma_entrega_nombre: vale.firma_entrega_nombre || '',
     })
+  }
+
+  const handleEditClick = (vale) => {
+    if (expandedId !== vale.id) setExpandedId(vale.id)
+    startEdit(vale)
   }
 
   const cancelEdit = () => {
@@ -108,10 +120,13 @@ export default function Vales() {
   }
 
   const handleDelete = async (vale) => {
-    if (!window.confirm(`¿Eliminar Vale #${vale.recibo_no || vale.id}?`)) return
+    const msg = `¿Eliminar Vale #${vale.recibo_no || vale.id}?\n\n¿Devolver materiales al inventario?`
+    const opcion = window.confirm(msg)
+    if (opcion === null) return
+    const returnStock = opcion
     try {
-      await api.delete(`/inventory/vales/${vale.id}/`)
-      notify.success('Vale eliminado')
+      await api.delete(`/inventory/vales/${vale.id}/?return_stock=${returnStock}`)
+      notify.success(returnStock ? 'Vale eliminado y materiales devueltos al stock' : 'Vale eliminado')
       fetchVales()
     } catch {
       notify.error('Error al eliminar el vale')
@@ -202,8 +217,13 @@ export default function Vales() {
                     <td><strong>{v.recibo_no || '—'}</strong></td>
                     <td>{new Date(v.fecha).toLocaleString()}</td>
                     <td>{v.empleado_no} — {v.empleado_nombre}</td>
-                    <td>{v.material_info?.code} — {v.material_info?.name}</td>
-                    <td>{v.cantidad}</td>
+                    <td>
+                      {v.items && v.items.length > 0
+                        ? `${v.items.length} artículo(s)`
+                        : (v.material_info?.code || '—')
+                      }
+                    </td>
+                    <td>{v.items && v.items.length > 0 ? v.items.reduce((s, i) => s + i.cantidad, 0) : v.cantidad || '—'}</td>
                     <td>
                       <span style={{ fontSize: '0.75rem' }}>
                         {[v.firma_supervisor, v.firma_gerente, v.firma_empleado, v.firma_entrega].filter(Boolean).length}/4
@@ -214,7 +234,7 @@ export default function Vales() {
                         <button className="btn btn-sm" onClick={() => printVale(v)}>Imprimir</button>
                         {canEdit && (
                           <>
-                            <button className="btn btn-sm btn-secondary" onClick={() => startEdit(v)}>Editar</button>
+                            <button className="btn btn-sm btn-secondary" onClick={() => handleEditClick(v)}>Editar</button>
                             <button className="btn btn-sm btn-danger" onClick={() => handleDelete(v)}>Eliminar</button>
                           </>
                         )}
@@ -234,57 +254,102 @@ export default function Vales() {
                                   <span className="detail-value">{v.empleado_no} — {v.empleado_nombre}</span>
                                 </div>
                                 <div className="vale-detail-field">
-                                  <span className="detail-label">Material</span>
-                                  <span className="detail-value">{v.material_info?.code} — {v.material_info?.name}</span>
-                                </div>
-                                <div className="vale-detail-field">
                                   <span className="detail-label">Línea / Área</span>
                                   <span className="detail-value">{v.linea_nombre} / {v.area_nombre}</span>
                                 </div>
                                 <div className="vale-detail-field">
                                   <span className="detail-label">Recibo No.</span>
-                                  <span className="detail-value">{v.recibo_no || '—'}</span>
-                                </div>
-                                <div className="vale-detail-field">
-                                  <span className="detail-label">Cantidad</span>
                                   <input
-                                    type="number"
                                     className="form-control"
-                                    min="1"
-                                    value={editForm.cantidad}
-                                    onChange={e => handleEditChange('cantidad', e.target.value)}
-                                    style={{ width: '100px' }}
+                                    value={editForm.recibo_no}
+                                    onChange={e => handleEditChange('recibo_no', e.target.value)}
+                                    style={{ width: '160px' }}
                                   />
                                 </div>
                                 <div className="vale-detail-field">
-                                  <span className="detail-label">Costo</span>
-                                  <span className="detail-value">${v.costo}</span>
-                                </div>
-                                <div className="vale-detail-field" style={{ gridColumn: '1 / -1' }}>
-                                  <span className="detail-label">Observaciones</span>
-                                  <textarea
+                                  <span className="detail-label">Fecha</span>
+                                  <input
+                                    type="datetime-local"
                                     className="form-control"
-                                    rows={2}
-                                    value={editForm.observaciones}
-                                    onChange={e => handleEditChange('observaciones', e.target.value)}
+                                    value={editForm.fecha}
+                                    onChange={e => handleEditChange('fecha', e.target.value)}
                                   />
                                 </div>
+                                <div className="vale-detail-field">
+                                  <span className="detail-label">Registrado por</span>
+                                  <span className="detail-value">{v.registrado_por_nombre || '—'}</span>
+                                </div>
+                              </div>
+
+                              {/* Items table — read-only even in edit mode */}
+                              <div className="vale-detail-field" style={{ gridColumn: '1 / -1', marginTop: 8 }}>
+                                <span className="detail-label">Artículos</span>
+                                <table className="table" style={{ marginTop: 4 }}>
+                                  <thead>
+                                    <tr>
+                                      <th>Código</th>
+                                      <th>Nombre</th>
+                                      <th>Cantidad</th>
+                                      <th>Costo</th>
+                                      <th>Total</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {(v.items && v.items.length > 0 ? v.items : [v]).map((item, i) => {
+                                      const matInfo = item.material_info || item.material
+                                      const code = matInfo?.code || item.material_info?.code || '—'
+                                      const name = matInfo?.name || item.material_info?.name || '—'
+                                      const cant = item.cantidad || 0
+                                      const cost = item.costo || 0
+                                      return (
+                                        <tr key={i}>
+                                          <td className="font-mono">{code}</td>
+                                          <td>{name}</td>
+                                          <td>{cant}</td>
+                                          <td>${parseFloat(cost).toFixed(2)}</td>
+                                          <td>${(cant * cost).toFixed(2)}</td>
+                                        </tr>
+                                      )
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+
+                              <div className="vale-detail-field" style={{ gridColumn: '1 / -1' }}>
+                                <span className="detail-label">Observaciones</span>
+                                <textarea
+                                  className="form-control"
+                                  rows={2}
+                                  value={editForm.observaciones}
+                                  onChange={e => handleEditChange('observaciones', e.target.value)}
+                                />
                               </div>
 
                               <div className="signature-grid">
                                 {FIRMAS.map(f => (
                                   <div key={f.key} className={`signature-item ${editForm[f.key] ? 'signed' : 'pending'}`}>
-                                    <label>
-                                      <input
-                                        type="checkbox"
-                                        checked={editForm[f.key]}
-                                        onChange={e => handleEditChange(f.key, e.target.checked)}
-                                      />
-                                      {f.label}
-                                      <span className="signature-status">
-                                        {editForm[f.key] ? 'Firmado' : 'Pendiente'}
-                                      </span>
-                                    </label>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
+                                      <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: 'pointer', fontSize: '0.85rem' }}>
+                                        <input
+                                          type="checkbox"
+                                          checked={editForm[f.key]}
+                                          onChange={e => handleEditChange(f.key, e.target.checked)}
+                                        />
+                                        {f.label}
+                                        <span className="signature-status">
+                                          {editForm[f.key] ? 'Firmado' : 'Pendiente'}
+                                        </span>
+                                      </label>
+                                      {editForm[f.key] && (
+                                        <input
+                                          className="form-control"
+                                          placeholder="Nombre de quien firma"
+                                          value={editForm[f.nameKey] || ''}
+                                          onChange={e => handleEditChange(f.nameKey, e.target.value)}
+                                          style={{ fontSize: '0.8rem' }}
+                                        />
+                                      )}
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -303,24 +368,12 @@ export default function Vales() {
                                   <span className="detail-value">{v.empleado_no} — {v.empleado_nombre}</span>
                                 </div>
                                 <div className="vale-detail-field">
-                                  <span className="detail-label">Material</span>
-                                  <span className="detail-value">{v.material_info?.code} — {v.material_info?.name}</span>
-                                </div>
-                                <div className="vale-detail-field">
                                   <span className="detail-label">Línea / Área</span>
                                   <span className="detail-value">{v.linea_nombre} / {v.area_nombre}</span>
                                 </div>
                                 <div className="vale-detail-field">
                                   <span className="detail-label">Recibo No.</span>
                                   <span className="detail-value">{v.recibo_no || '—'}</span>
-                                </div>
-                                <div className="vale-detail-field">
-                                  <span className="detail-label">Cantidad</span>
-                                  <span className="detail-value">{v.cantidad}</span>
-                                </div>
-                                <div className="vale-detail-field">
-                                  <span className="detail-label">Costo</span>
-                                  <span className="detail-value">${v.costo}</span>
                                 </div>
                                 <div className="vale-detail-field">
                                   <span className="detail-label">Fecha</span>
@@ -336,32 +389,64 @@ export default function Vales() {
                                     <span className="detail-value">{v.observaciones}</span>
                                   </div>
                                 )}
+                                <div className="vale-detail-field" style={{ gridColumn: '1 / -1' }}>
+                                  <span className="detail-label">Artículos</span>
+                                  <table className="table" style={{ marginTop: 4 }}>
+                                    <thead>
+                                      <tr>
+                                        <th>Código</th>
+                                        <th>Nombre</th>
+                                        <th>Cantidad</th>
+                                        <th>Costo</th>
+                                        <th>Total</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {(v.items && v.items.length > 0 ? v.items : [v]).map((item, i) => {
+                                        const matInfo = item.material_info || item.material
+                                        const code = matInfo?.code || item.material_info?.code || '—'
+                                        const name = matInfo?.name || item.material_info?.name || '—'
+                                        const cant = item.cantidad || 0
+                                        const cost = item.costo || 0
+                                        return (
+                                          <tr key={i}>
+                                            <td className="font-mono">{code}</td>
+                                            <td>{name}</td>
+                                            <td>{cant}</td>
+                                            <td>${parseFloat(cost).toFixed(2)}</td>
+                                            <td>${(cant * cost).toFixed(2)}</td>
+                                          </tr>
+                                        )
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
                               </div>
 
                               <div className="signature-grid">
                                 {FIRMAS.map(f => (
                                   <div key={f.key} className={`signature-item ${v[f.key] ? 'signed' : 'pending'}`}>
-                                    <label>
-                                      <input
-                                        type="checkbox"
-                                        checked={v[f.key]}
-                                        disabled
-                                      />
-                                      {f.label}
-                                      <span className="signature-status">
-                                        {v[f.key] ? 'Firmado' : 'Pendiente'}
-                                      </span>
-                                    </label>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
+                                      <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: '0.85rem' }}>
+                                        <input
+                                          type="checkbox"
+                                          checked={v[f.key]}
+                                          disabled
+                                        />
+                                        {f.label}
+                                        <span className="signature-status">
+                                          {v[f.key] ? 'Firmado' : 'Pendiente'}
+                                        </span>
+                                      </label>
+                                      {v[f.key] && v[f.nameKey] && (
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', paddingLeft: '24px' }}>
+                                          {v[f.nameKey]}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                 ))}
                               </div>
-
-                              {canEdit && (
-                                <div className="detail-actions">
-                                  <button className="btn btn-sm btn-secondary" onClick={() => startEdit(v)}>Editar</button>
-                                  <button className="btn btn-sm btn-danger" onClick={() => handleDelete(v)}>Eliminar</button>
-                                </div>
-                              )}
                             </div>
                           )}
                         </div>

@@ -32,12 +32,21 @@ def actualizar_stock_salida(sender, instance, created, **kwargs):
 @receiver(post_save, sender='inventory.Vale')
 def actualizar_stock_vale(sender, instance, created, **kwargs):
     """
-    Al crear un vale, restar cantidad del stock del material SOLO SI
+    Al crear un vale, restar cantidad del stock de cada material SOLO SI
     no está ya vinculado a una Salida (para evitar doble resta).
     """
     if created and not instance.salida:
-        with transaction.atomic():
-            material = instance.material
-            material.stock_actual = F('stock_actual') - instance.cantidad
-            material.save(update_fields=['stock_actual', 'actualizado_en'])
-            material.refresh_from_db(fields=['stock_actual'])
+        items = instance.items.all()
+        if items.exists():
+            for item in items:
+                with transaction.atomic():
+                    material = item.material
+                    material.stock_actual = F('stock_actual') - item.cantidad
+                    material.save(update_fields=['stock_actual', 'actualizado_en'])
+                    material.refresh_from_db(fields=['stock_actual'])
+        elif instance.material:
+            with transaction.atomic():
+                material = instance.material
+                material.stock_actual = F('stock_actual') - instance.cantidad
+                material.save(update_fields=['stock_actual', 'actualizado_en'])
+                material.refresh_from_db(fields=['stock_actual'])

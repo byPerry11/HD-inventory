@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend
@@ -103,29 +103,29 @@ export default function Dashboard() {
   const [recientes, setRecientes]     = useState({ entradas: [], salidas: [], vales: [] })
   const [loading, setLoading]         = useState(true)
   const [selectedVale, setSelectedVale] = useState(null)
+  const [periodo, setPeriodo]         = useState(30)
 
-  useEffect(() => {
-    const loadAll = async () => {
-      setLoading(true)
-      try {
-        const [res, ale, sug, con, top, rec] = await Promise.all([
-          api.get('/analytics/resumen/'),
-          api.get('/analytics/alertas/'),
-          api.get('/analytics/sugerencias-compra/'),
-          api.get('/analytics/consumo-por-linea/'),
-          api.get('/analytics/top-salidas/'),
-          api.get('/analytics/movimientos-recientes/'),
-        ])
-        setResumen(res.data)
-        setAlertas(ale.data)
-        setSugerencias(sug.data || [])
-        setConsumo(con.data.data || [])
-        setTopSalidas(top.data.data || [])
-        setRecientes(rec.data)
-      } catch { /* silenciar */ } finally { setLoading(false) }
-    }
-    loadAll()
+  const loadAll = useCallback(async (dias) => {
+    setLoading(true)
+    try {
+      const [res, ale, sug, con, top, rec] = await Promise.all([
+        api.get('/analytics/resumen/'),
+        api.get('/analytics/alertas/'),
+        api.get('/analytics/sugerencias-compra/'),
+        api.get(`/analytics/consumo-por-linea/?dias=${dias}`),
+        api.get(`/analytics/top-salidas/?dias=${dias}`),
+        api.get('/analytics/movimientos-recientes/'),
+      ])
+      setResumen(res.data)
+      setAlertas(ale.data)
+      setSugerencias(sug.data || [])
+      setConsumo(con.data.data || [])
+      setTopSalidas(top.data.data || [])
+      setRecientes(rec.data)
+    } catch { /* silenciar */ } finally { setLoading(false) }
   }, [])
+
+  useEffect(() => { loadAll(periodo) }, [periodo, loadAll])
 
   if (loading) return (
     <div className="loading-container" style={{ minHeight: '60vh' }}>
@@ -167,6 +167,14 @@ export default function Dashboard() {
               <span style={{ fontSize: '0.8em', verticalAlign: 'middle', marginRight: '4px' }}>$</span>
               {resumen.ordenes_activas_monto_usd.toLocaleString()}
             </div>
+          </div>
+          <div className="stat-card" style={{ borderLeft: '4px solid #1f6feb' }}>
+            <div className="stat-label">Costo Consumo (30 días)</div>
+            <div className="stat-value monetary" style={{ color: 'var(--color-text-primary)' }}>
+              <span style={{ fontSize: '0.8em', verticalAlign: 'middle', marginRight: '4px' }}>$</span>
+              {(resumen.costo_consumo_mes || 0).toLocaleString()}
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>Materiales vía vales</div>
           </div>
         </div>
       )}
@@ -277,7 +285,16 @@ export default function Dashboard() {
       <div className="dashboard-charts">
         {/* Consumo por línea */}
         <div className="card">
-          <h2 className="dashboard-section-title"><IconActivity /> Consumo por Línea (30 días)</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
+            <h2 className="dashboard-section-title" style={{ margin: 0 }}><IconActivity /> Consumo por Línea</h2>
+            <select className="form-control" value={periodo} onChange={e => setPeriodo(Number(e.target.value))}
+              style={{ width: 'auto', fontSize: '0.8rem' }}>
+              <option value={7}>7 días</option>
+              <option value={30}>30 días</option>
+              <option value={60}>60 días</option>
+              <option value={90}>90 días</option>
+            </select>
+          </div>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={consumo} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
@@ -334,7 +351,7 @@ export default function Dashboard() {
       <div className="dashboard-bottom">
         {/* Top materiales más despachados */}
         <div className="card">
-          <h2 className="dashboard-section-title"><IconAward /> Top Materiales Despachados (30 días)</h2>
+          <h2 className="dashboard-section-title"><IconAward /> Top Materiales Despachados ({periodo} días)</h2>
           <div className="table-container">
             <table className="table">
               <thead>
@@ -348,7 +365,7 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {topSalidas.length === 0 ? (
-                  <tr><td colSpan={5} style={{ textAlign:'center', padding:32, color:'var(--color-text-muted)' }}>Sin datos en los últimos 30 días</td></tr>
+                  <tr><td colSpan={5} style={{ textAlign:'center', padding:32, color:'var(--color-text-muted)' }}>Sin datos en los últimos {periodo} días</td></tr>
                 ) : topSalidas.map((item, idx) => (
                   <tr key={item.material__id}>
                     <td className="text-muted">{idx + 1}</td>
@@ -363,35 +380,44 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Vales de Consumo (Salidas Recientes) */}
+        {/* Vales de Consumo (Recientes) */}
         <div className="card">
           <h2 className="dashboard-section-title"><IconFileText /> Vales de Consumo Recientes</h2>
           <div className="dashboard-vales-list">
             {recientes.vales?.length === 0 ? (
               <p className="text-muted text-center py-4">Sin vales registrados recientemente</p>
             ) : (
-              recientes.vales?.map(vale => (
-                <div key={vale.id} className="vale-card" onClick={() => setSelectedVale(vale)}>
-                  <div className="vale-card-main">
-                    <span className="vale-card-folio">VALE #{vale.recibo_no || vale.id}</span>
-                    <span className="vale-card-dest">{vale.linea || 'General'} · {vale.area || 'Sin área'}</span>
-                    <span className="vale-card-meta">
-                      {vale.recibio} · {new Date(vale.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+              recientes.vales?.map(vale => {
+                const qty = vale.items?.length > 0
+                  ? vale.items.reduce((s, i) => s + i.cantidad, 0)
+                  : vale.cantidad
+                return (
+                  <div key={vale.id} className="vale-card" onClick={() => setSelectedVale(vale)}>
+                    <div className="vale-card-main">
+                      <span className="vale-card-folio">VALE #{vale.recibo_no || vale.id}</span>
+                      <span className="vale-card-dest">{vale.linea || 'General'} · {vale.area || 'Sin área'}</span>
+                      <span className="vale-card-meta">
+                        {vale.recibio} · {new Date(vale.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <div className="vale-card-right">
+                      <span className="vale-card-qty">-{qty}</span>
+                      {vale.items?.length > 0 ? (
+                        <span style={{ fontSize: '9px', opacity: 0.6 }}>{vale.items.length} artículos</span>
+                      ) : (
+                        <span className="font-mono" style={{ fontSize: '10px', opacity: 0.7 }}>{vale.material_code}</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="vale-card-right">
-                    <span className="vale-card-qty">-{vale.cantidad}</span>
-                    <span className="font-mono" style={{fontSize: '10px', opacity: 0.7}}>{vale.material_code}</span>
-                  </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </div>
       </div>
 
-      {/* ─── Modal Vista Rápida ────────────────────────────── */}
-      {selectedVale && (
+      {/* ─── Modal Vista Rápida Vale ────────────────────────── */}
+      {selectedVale && selectedVale.tipo === 'vale' && (
         <div className="quick-view-overlay" onClick={() => setSelectedVale(null)}>
           <div className="quick-view-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
@@ -399,25 +425,13 @@ export default function Dashboard() {
               <button className="btn-close" onClick={() => setSelectedVale(null)}>✕</button>
             </div>
             <div className="modal-body">
-              <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
+              <div style={{ textAlign: 'center', marginBottom: 'var(--space-4)' }}>
                 <span className="vale-card-folio" style={{ fontSize: '1rem' }}>VALE #{selectedVale.recibo_no || selectedVale.id}</span>
                 <div style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>
-                  Fecha: {new Date(selectedVale.fecha).toLocaleString()}
+                  {new Date(selectedVale.fecha).toLocaleString()}
                 </div>
               </div>
 
-              <div className="detail-row">
-                <span className="detail-label">Material:</span>
-                <span className="detail-value">{selectedVale.material_name}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">No. Parte:</span>
-                <span className="detail-value font-mono">{selectedVale.material_code}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Cantidad:</span>
-                <span className="detail-value" style={{ color: 'var(--color-urge)' }}>-{selectedVale.cantidad}</span>
-              </div>
               <div className="detail-row">
                 <span className="detail-label">Recibió:</span>
                 <span className="detail-value">{selectedVale.recibio} (No. {selectedVale.empleado_no || '—'})</span>
@@ -426,17 +440,55 @@ export default function Dashboard() {
                 <span className="detail-label">Destino:</span>
                 <span className="detail-value">{selectedVale.linea} / {selectedVale.area}</span>
               </div>
-              <div className="detail-row">
-                <span className="detail-label">Turno:</span>
-                <span className="detail-value">{selectedVale.turno}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Comentarios:</span>
-                <span className="detail-value" style={{ fontStyle: 'italic' }}>{selectedVale.observaciones || 'Sin observaciones'}</span>
-              </div>
+              {selectedVale.observaciones && (
+                <div className="detail-row">
+                  <span className="detail-label">Comentarios:</span>
+                  <span className="detail-value" style={{ fontStyle: 'italic' }}>{selectedVale.observaciones}</span>
+                </div>
+              )}
               <div className="detail-row">
                 <span className="detail-label">Capturado por:</span>
                 <span className="detail-value">{selectedVale.usuario}</span>
+              </div>
+
+              {selectedVale.items && selectedVale.items.length > 0 ? (
+                <div style={{ marginTop: 'var(--space-3)' }}>
+                  <span className="detail-label">Artículos</span>
+                  <table className="table" style={{ marginTop: 4 }}>
+                    <thead>
+                      <tr>
+                        <th>Código</th>
+                        <th>Nombre</th>
+                        <th>Cantidad</th>
+                        <th>Costo</th>
+                        <th>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedVale.items.map((item, i) => (
+                        <tr key={i}>
+                          <td className="font-mono">{item.material_code}</td>
+                          <td>{item.material_name}</td>
+                          <td>{item.cantidad}</td>
+                          <td>${(item.costo || 0).toFixed(2)}</td>
+                          <td>${((item.cantidad || 0) * (item.costo || 0)).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="detail-row">
+                  <span className="detail-label">Material:</span>
+                  <span className="detail-value">{selectedVale.material_name}</span>
+                </div>
+              )}
+
+              <div className="detail-row">
+                <span className="detail-label">Cantidad total:</span>
+                <span className="detail-value" style={{ color: 'var(--color-urge)', fontWeight: 600 }}>
+                  -{selectedVale.cantidad}
+                </span>
               </div>
             </div>
             <div className="modal-footer">

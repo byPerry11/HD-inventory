@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { usePersistentState } from '../../hooks/usePersistentState'
 import api from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
@@ -27,19 +27,32 @@ export default function Entradas() {
   const canCreateMaterial = user?.role === 'manager' || user?.role === 'supervisor'
 
   const [form, setForm]           = usePersistentState('hd_entr_form', EMPTY_FORM)
-  const [materiales, setMateriales] = useState([])
+  const [searchResults, setSearchResults] = useState([])
   const [search, setSearch]       = usePersistentState('hd_entr_search', '')
   const [selected, setSelected]   = usePersistentState('hd_entr_sel', null)
   const [loading, setLoading]     = useState(false)
   const [success, setSuccess]     = useState(false)
   const [error, setError]         = useState('')
+  const searchTimer = useRef(null)
 
   const [showNewMaterial, setShowNewMaterial] = useState(false)
   const [newMatForm, setNewMatForm] = useState(EMPTY_NEW_MATERIAL)
   const [newMatLoading, setNewMatLoading] = useState(false)
   const [categories, setCategories] = useState([])
 
-  useEffect(() => { fetchMateriales() }, [])
+  const fetchMaterials = async (q) => {
+    if (!q) { setSearchResults([]); return }
+    try {
+      const params = `?search=${encodeURIComponent(q)}&page_size=20`
+      const { data } = await api.get(`/materials/${params}`)
+      setSearchResults(data.results || data)
+    } catch { /* silenciar */ }
+  }
+
+  const doSearch = (q) => {
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    searchTimer.current = setTimeout(() => fetchMaterials(q), 300)
+  }
 
   useEffect(() => {
     if (showNewMaterial && categories.length === 0) {
@@ -47,22 +60,11 @@ export default function Entradas() {
     }
   }, [showNewMaterial])
 
-  const fetchMateriales = async () => {
-    try {
-      const { data } = await api.get('/materials/?page_size=500')
-      setMateriales(data.results || data)
-    } catch { /* silenciar */ }
-  }
-
-  const filtered = materiales.filter(m =>
-    m.name.toLowerCase().includes(search.toLowerCase()) ||
-    m.code.toLowerCase().includes(search.toLowerCase())
-  )
-
   const selectMaterial = (m) => {
     setSelected(m)
     setForm(f => ({ ...f, material: m.id }))
     setSearch(`${m.code} — ${m.name}`)
+    setSearchResults([])
   }
 
   const handleChange = (e) => {
@@ -77,7 +79,6 @@ export default function Entradas() {
       await api.post('/inventory/entradas/', form)
       setSuccess(true)
       setForm(EMPTY_FORM); setSelected(null); setSearch('')
-      fetchMateriales()
       setTimeout(() => setSuccess(false), 4000)
     } catch (err) {
       setError(err.response?.data?.detail || 'Error al registrar la entrada.')
@@ -114,16 +115,16 @@ export default function Entradas() {
                 type="text"
                 placeholder="Buscar por código o nombre..."
                 value={search}
-                onChange={e => { setSearch(e.target.value); setSelected(null); setForm(f => ({...f, material:''})) }}
+                onChange={e => { const v = e.target.value; setSearch(v); setSelected(null); setForm(f => ({...f, material:''})); doSearch(v) }}
               />
-              {search && !selected && filtered.length > 0 && (
+              {!selected && searchResults.length > 0 && (
                 <ul style={{
                   position:'absolute', top:'calc(100% + 4px)', left:0, right:0,
                   background:'var(--color-bg-card)', border:'1px solid var(--color-border)',
                   borderRadius:'var(--radius-md)', boxShadow:'var(--shadow-lg)',
                   zIndex:50, maxHeight:240, overflowY:'auto', listStyle:'none'
                 }}>
-                  {filtered.slice(0, 8).map(m => (
+                  {searchResults.slice(0, 10).map(m => (
                     <li key={m.id}
                       onClick={() => selectMaterial(m)}
                       style={{
@@ -248,7 +249,6 @@ export default function Entradas() {
                 })
                 setShowNewMaterial(false)
                 setNewMatForm(EMPTY_NEW_MATERIAL)
-                fetchMateriales()
               } catch (err) {
                 const detail = err.response?.data
                 const msg = typeof detail === 'object' ? Object.entries(detail).map(([k,v]) => `${k}: ${v}`).join(', ') : (detail || 'Error al crear el material')

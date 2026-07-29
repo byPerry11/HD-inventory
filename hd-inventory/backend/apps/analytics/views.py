@@ -2,46 +2,65 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.db.models import Sum, Count, F, Value
+from django.db.models import Sum, Count, F, Value, Q
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from datetime import timedelta
 
 from apps.accounts.permissions import IsSupervisorOrAbove
 from apps.materials.models import Material
-from apps.inventory.models import Entrada, Salida, Vale
+from apps.inventory.models import Entrada, Salida, Vale, ValeItem
 from apps.purchases.models import OrdenCompra
 
 
 class ResumenView(APIView):
     """
-    Resumen general del inventario.
+    Resumen general del inventario + métricas de costo.
     Acceso: Supervisor y Manager.
     """
     permission_classes = [IsSupervisorOrAbove]
 
     def get(self, request):
-        materiales = Material.objects.filter(activo=True)
-        total = materiales.count()
-        ok = sum(1 for m in materiales if m.estado == 'ok')
-        ordenar = sum(1 for m in materiales if m.estado == 'ordenar')
-        urge = sum(1 for m in materiales if m.estado == 'urge')
-
-        # Movimientos del hoy
         hoy = timezone.now().date()
+
+        # ── Estado de materiales (estado es @property, se evalúa en Python) ──
+        materiales = Material.objects.filter(activo=True).only(
+            'id', 'stock_actual', 'stock_minimo', 'stock_critico'
+        )
+        total = ok = ordenar = urge = 0
+        for m in materiales:
+            total += 1
+            if m.estado == 'ok':      ok += 1
+            if m.estado == 'ordenar': ordenar += 1
+            if m.estado == 'urge':    urge += 1
+
+        # ── Movimientos del día ──
         entradas_hoy = Entrada.objects.filter(fecha__date=hoy).count()
         salidas_hoy = Salida.objects.filter(fecha__date=hoy).count()
 
-        # Montos de órdenes activas (excluyendo recibidas y canceladas)
-        ordenes_activas = OrdenCompra.objects.exclude(status__in=['recibido', 'rem_recibido', 'cancelado'])
-        
+        # ── Órdenes activas ──
+        ordenes_activas = OrdenCompra.objects.exclude(
+            status__in=['recibido', 'rem_recibido', 'cancelado']
+        )
         monto_mxn = ordenes_activas.filter(moneda='MXN').aggregate(
             total=Sum(F('cantidad') * F('costo_unitario'))
         )['total'] or 0
-        
         monto_usd = ordenes_activas.filter(moneda='USD').aggregate(
             total=Sum(F('cantidad') * F('costo_unitario'))
         )['total'] or 0
+
+        # ── Métricas de costo (vales + salidas, último mes) ──
+        desde = timezone.now() - timedelta(days=30)
+        costo_vales = (
+            ValeItem.objects.filter(vale__fecha__gte=desde)
+            .aggregate(total=Sum(F('cantidad') * F('costo')))['total'] or 0
+        )
+        # Legacy vales (material único, sin items)
+        costo_vales_legacy = (
+            Vale.objects.filter(fecha__gte=desde, items__isnull=True)
+            .exclude(material__isnull=True)
+            .aggregate(total=Sum(F('cantidad') * F('costo')))['total'] or 0
+        )
 
         return Response({
             'materiales_total': total,
@@ -53,13 +72,14 @@ class ResumenView(APIView):
             'ordenes_activas_monto_mxn': round(float(monto_mxn), 2),
             'ordenes_activas_monto_usd': round(float(monto_usd), 2),
             'ordenes_activas_count': ordenes_activas.count(),
+            'costo_consumo_mes': round(float(costo_vales + costo_vales_legacy), 2),
         })
 
 
 class ConsumoPorLineaView(APIView):
     """
-    Consumo de materiales agrupado por línea de producción.
-    Retorna las líneas con mayor consumo en los últimos 30 días.
+    Consumo de materiales agrupado por línea de producción,
+    incluyendo Vales sin Salida asociada.
     """
     permission_classes = [IsSupervisorOrAbove]
 
@@ -67,33 +87,66 @@ class ConsumoPorLineaView(APIView):
         dias = int(request.query_params.get('dias', 30))
         desde = timezone.now() - timedelta(days=dias)
 
-        consumo = (
+        # Salidas
+        salidas = (
             Salida.objects
             .filter(fecha__gte=desde)
             .values(
                 linea_nombre=Coalesce(
-                    F('linea__nombre'),
-                    F('linea_legacy'),
-                    Value('Sin asignar')
+                    F('linea__nombre'), F('linea_legacy'), Value('Sin asignar')
                 )
             )
             .annotate(
                 total_movimientos=Count('id'),
                 total_unidades=Sum('cantidad'),
             )
-            .order_by('-total_unidades')
         )
 
-        return Response({
-            'dias': dias,
-            'data': list(consumo),
-        })
+        # Vales sin salida asociada (para evitar doble conteo)
+        vales = (
+            Vale.objects
+            .filter(fecha__gte=desde, salida__isnull=True)
+            .values(
+                linea_nombre=Coalesce(
+                    F('linea__nombre'), Value('Sin asignar')
+                )
+            )
+            .annotate(
+                total_movimientos=Count('id'),
+                total_unidades=Sum('items__cantidad'),
+            )
+        )
+
+        # Merge
+        merged = {}
+        for row in salidas:
+            ln = row['linea_nombre']
+            merged[ln] = {
+                'linea_nombre': ln,
+                'total_movimientos': row['total_movimientos'],
+                'total_unidades': row['total_unidades'] or 0,
+            }
+        for row in vales:
+            ln = row['linea_nombre']
+            if ln in merged:
+                merged[ln]['total_movimientos'] += row['total_movimientos']
+                merged[ln]['total_unidades'] += row['total_unidades'] or 0
+            else:
+                merged[ln] = {
+                    'linea_nombre': ln,
+                    'total_movimientos': row['total_movimientos'],
+                    'total_unidades': row['total_unidades'] or 0,
+                }
+
+        data = sorted(merged.values(), key=lambda x: -x['total_unidades'])
+
+        return Response({'dias': dias, 'data': data})
 
 
 class TopSalidasView(APIView):
     """
-    Materiales que se despachan con más frecuencia.
-    Top 10 en los últimos 30 días.
+    Materiales más despachados (Salidas + Vales sin Salida).
+    Top 10 en los últimos N días.
     """
     permission_classes = [IsSupervisorOrAbove]
 
@@ -102,28 +155,71 @@ class TopSalidasView(APIView):
         limite = int(request.query_params.get('limite', 10))
         desde = timezone.now() - timedelta(days=dias)
 
-        top = (
+        # Salidas agrupadas por material
+        salidas = (
             Salida.objects
             .filter(fecha__gte=desde)
-            .values('material__id', 'material__code', 'material__name', 'material__unit')
+            .values(
+                'material_id',
+                'material__code',
+                'material__name',
+                'material__unit',
+            )
             .annotate(
                 total_movimientos=Count('id'),
                 total_unidades=Sum('cantidad'),
             )
-            .order_by('-total_movimientos')[:limite]
         )
 
-        return Response({
-            'dias': dias,
-            'data': list(top),
-        })
+        # ValeItems de vales sin salida
+        vales = (
+            ValeItem.objects
+            .filter(vale__fecha__gte=desde, vale__salida__isnull=True)
+            .values(
+                'material_id',
+                'material__code',
+                'material__name',
+                'material__unit',
+            )
+            .annotate(
+                total_movimientos=Count('vale__id', distinct=True),
+                total_unidades=Sum('cantidad'),
+            )
+        )
+
+        merged = {}
+        for row in salidas:
+            mid = row['material_id']
+            merged[mid] = {
+                'material__id': mid,
+                'material__code': row['material__code'],
+                'material__name': row['material__name'],
+                'material__unit': row['material__unit'],
+                'total_movimientos': row['total_movimientos'],
+                'total_unidades': row['total_unidades'] or 0,
+            }
+        for row in vales:
+            mid = row['material_id']
+            if mid in merged:
+                merged[mid]['total_movimientos'] += row['total_movimientos']
+                merged[mid]['total_unidades'] += row['total_unidades'] or 0
+            else:
+                merged[mid] = {
+                    'material__id': mid,
+                    'material__code': row['material__code'],
+                    'material__name': row['material__name'],
+                    'material__unit': row['material__unit'],
+                    'total_movimientos': row['total_movimientos'],
+                    'total_unidades': row['total_unidades'] or 0,
+                }
+
+        data = sorted(merged.values(), key=lambda x: -x['total_movimientos'])[:limite]
+
+        return Response({'dias': dias, 'data': data})
 
 
 class AlertasView(APIView):
-    """
-    Materiales en estado 'ordenar' or 'urge'.
-    Acceso: Supervisor y Manager.
-    """
+    """Materiales en estado 'ordenar' or 'urge'."""
     permission_classes = [IsSupervisorOrAbove]
 
     def get(self, request):
@@ -131,18 +227,15 @@ class AlertasView(APIView):
         urge = [m for m in materiales if m.estado == 'urge']
         ordenar = [m for m in materiales if m.estado == 'ordenar']
 
-        # Obtener OCs activas para estos materiales de forma eficiente
         material_ids = [m.id for m in urge] + [m.id for m in ordenar]
         active_orders = {}
         if material_ids:
-            # Una orden se considera "activa" si no está recibida ni cancelada
             ocs = OrdenCompra.objects.filter(
                 material_id__in=material_ids
             ).exclude(
                 status__in=['recibido', 'rem_recibido', 'cancelado']
             ).order_by('material_id', '-fecha_emision')
-            
-            # Tomamos la más reciente para cada material
+
             for oc in ocs:
                 if oc.material_id not in active_orders:
                     active_orders[oc.material_id] = {
@@ -172,7 +265,7 @@ class AlertasView(APIView):
 
 
 class MovimientosRecientesView(APIView):
-    """Últimas 20 entradas y salidas."""
+    """Últimas 20 entradas, salidas y vales."""
     permission_classes = [IsSupervisorOrAbove]
 
     def get(self, request):
@@ -189,6 +282,7 @@ class MovimientosRecientesView(APIView):
         vales = (
             Vale.objects
             .select_related('material', 'registrado_por', 'linea', 'area')
+            .prefetch_related('items__material')
             .order_by('-fecha')[:10]
         )
 
@@ -222,13 +316,33 @@ class MovimientosRecientesView(APIView):
             }
 
         def fmt_vale(v):
+            items = list(v.items.all())
+            total_qty = sum(i.cantidad for i in items) if items else (v.cantidad or 0)
+            first = items[0] if items else None
+            if first:
+                m_code = first.material.code
+                m_name = first.material.name
+            elif v.material:
+                m_code = v.material.code
+                m_name = v.material.name
+            else:
+                m_code = ''
+                m_name = ''
             return {
                 'tipo': 'vale',
                 'id': v.id,
                 'recibo_no': v.recibo_no,
-                'material_code': v.material.code,
-                'material_name': v.material.name,
-                'cantidad': v.cantidad,
+                'material_code': m_code,
+                'material_name': m_name,
+                'cantidad': total_qty,
+                'items': [
+                    {
+                        'material_code': i.material.code,
+                        'material_name': i.material.name,
+                        'cantidad': i.cantidad,
+                        'costo': float(i.costo),
+                    } for i in items
+                ] if items else [],
                 'fecha': v.fecha,
                 'linea': v.linea.nombre if v.linea else '',
                 'area': v.area.nombre if v.area else v.seccion_legacy,
@@ -245,13 +359,10 @@ class MovimientosRecientesView(APIView):
         })
 
 
-
 class SugerenciasCompraView(APIView):
     """
-    Cálculos aproximados para sugerencias de compra:
-    - Tiempo de entrega promedio por material (de OCs recibidas).
-    - Consumo estimado basado en salidas.
-    - Proyección de tiempo de agotamiento y tiempo para pedir más.
+    Sugerencias de compra basadas en Salidas + Vales (consumo real).
+    Incluye consumo de vales sin salida asociada.
     """
     permission_classes = [IsSupervisorOrAbove]
 
@@ -259,15 +370,52 @@ class SugerenciasCompraView(APIView):
         dias_historial = 60
         desde = timezone.now() - timedelta(days=dias_historial)
 
-        # 1. Consumo histórico
-        consumo_data = (
+        # Consumo via Salidas
+        salida_data = (
             Salida.objects
             .filter(fecha__gte=desde)
-            .values('material__id', 'material__stock_actual', 'material__code', 'material__name', 'material__unit')
+            .values(
+                'material__id', 'material__stock_actual',
+                'material__code', 'material__name', 'material__unit')
+            .annotate(total_salidas=Sum('cantidad'))
+        )
+        # Consumo via ValeItem (vales sin salida)
+        vale_data = (
+            ValeItem.objects
+            .filter(vale__fecha__gte=desde, vale__salida__isnull=True)
+            .values(
+                'material__id', 'material__stock_actual',
+                'material__code', 'material__name', 'material__unit')
             .annotate(total_salidas=Sum('cantidad'))
         )
 
-        # 2. Tiempos de entrega promedios
+        # Merge consumo
+        consumo_map = {}
+        for c in salida_data:
+            mid = c['material__id']
+            consumo_map[mid] = {
+                'material__id': mid,
+                'material__stock_actual': c['material__stock_actual'],
+                'material__code': c['material__code'],
+                'material__name': c['material__name'],
+                'material__unit': c['material__unit'],
+                'total_salidas': c['total_salidas'] or 0,
+            }
+        for c in vale_data:
+            mid = c['material__id']
+            if mid in consumo_map:
+                consumo_map[mid]['total_salidas'] += c['total_salidas'] or 0
+            else:
+                consumo_map[mid] = {
+                    'material__id': mid,
+                    'material__stock_actual': c['material__stock_actual'],
+                    'material__code': c['material__code'],
+                    'material__name': c['material__name'],
+                    'material__unit': c['material__unit'],
+                    'total_salidas': c['total_salidas'] or 0,
+                }
+
+        # Lead times
         ocs = OrdenCompra.objects.filter(
             status='recibido',
             fecha_po_aprobada__isnull=False,
@@ -275,18 +423,18 @@ class SugerenciasCompraView(APIView):
         )
         lead_time_por_mat = {}
         for oc in ocs:
-            if not oc.material_id: continue
+            if not oc.material_id:
+                continue
             dias_entrega = oc.tiempo_entrega_dias or 14
-            if oc.material_id not in lead_time_por_mat:
-                lead_time_por_mat[oc.material_id] = []
-            lead_time_por_mat[oc.material_id].append(dias_entrega)
+            lead_time_por_mat.setdefault(oc.material_id, []).append(dias_entrega)
 
-        promedios_lt = {}
-        for m_id, dias in lead_time_por_mat.items():
-            promedios_lt[m_id] = sum(dias) / len(dias)
+        promedios_lt = {
+            m_id: sum(dias) / len(dias)
+            for m_id, dias in lead_time_por_mat.items()
+        }
 
         sugerencias = []
-        for c in consumo_data:
+        for c in consumo_map.values():
             mat_id = c['material__id']
             stock = c['material__stock_actual']
             salidas = c['total_salidas']
@@ -296,9 +444,8 @@ class SugerenciasCompraView(APIView):
                 continue
 
             dias_agotamiento = stock / consumo_diario
-            lead_time = promedios_lt.get(mat_id, 14)  # 14 días por defecto si no hay historial de OCs
-
-            dias_para_comprar = dias_agotamiento - lead_time
+            lead_time = round(promedios_lt.get(mat_id, 14))
+            dias_para_comprar = round(dias_agotamiento - lead_time)
 
             sugerencias.append({
                 'material_id': mat_id,
@@ -307,22 +454,18 @@ class SugerenciasCompraView(APIView):
                 'unit': c['material__unit'],
                 'stock_actual': stock,
                 'consumo_diario_estimado': round(consumo_diario, 2),
-                'tiempo_entrega_estimado': round(lead_time),
+                'tiempo_entrega_estimado': lead_time,
                 'dias_para_agotarse': round(dias_agotamiento),
-                'dias_para_comprar': round(dias_para_comprar),
+                'dias_para_comprar': dias_para_comprar,
             })
 
-        # Ordenar por urgencia (menor días_para_comprar primero)
         sugerencias.sort(key=lambda x: x['dias_para_comprar'])
 
-        return Response(sugerencias[:15])  # Top 15 más urgentes
+        return Response(sugerencias[:15])
 
 
 class ConsumoPorAreaView(APIView):
-    """
-    Consumo de materiales agrupado por línea y área.
-    Permite filtrado más preciso combinando datos legacy y FK modernos.
-    """
+    """Consumo agrupado por línea y área (Salidas + Vales sin salida)."""
     permission_classes = [IsSupervisorOrAbove]
 
     def get(self, request):
@@ -331,37 +474,64 @@ class ConsumoPorAreaView(APIView):
         desde = timezone.now() - timedelta(days=dias)
 
         qs = Salida.objects.filter(fecha__gte=desde)
-
         if linea_filter:
-            # Filtrar por nombre de línea (FK o legacy)
-            from django.db.models import Q
             qs = qs.filter(
                 Q(linea__nombre=linea_filter) | Q(linea_legacy=linea_filter)
             )
 
-        consumo = (
+        salida_consumo = (
             qs
             .values(
                 linea_nombre=Coalesce(
-                    F('linea__nombre'),
-                    F('linea_legacy'),
-                    Value('Sin asignar')
+                    F('linea__nombre'), F('linea_legacy'), Value('Sin asignar')
                 ),
                 area_nombre=Coalesce(
-                    F('area__nombre'),
-                    F('seccion_legacy'),
-                    Value('General')
+                    F('area__nombre'), F('seccion_legacy'), Value('General')
                 ),
             )
             .annotate(
                 total_movimientos=Count('id'),
                 total_unidades=Sum('cantidad'),
             )
-            .order_by('linea_nombre', '-total_unidades')
         )
+
+        # Vales sin salida
+        vqs = Vale.objects.filter(fecha__gte=desde, salida__isnull=True)
+        if linea_filter:
+            vqs = vqs.filter(linea__nombre=linea_filter)
+
+        vale_consumo = (
+            vqs
+            .values(
+                linea_nombre=Coalesce(
+                    F('linea__nombre'), Value('Sin asignar')
+                ),
+                area_nombre=Coalesce(
+                    F('area__nombre'), Value('General')
+                ),
+            )
+            .annotate(
+                total_movimientos=Count('id'),
+                total_unidades=Sum('items__cantidad'),
+            )
+        )
+
+        merged = {}
+        for row in list(salida_consumo) + list(vale_consumo):
+            key = (row['linea_nombre'], row['area_nombre'])
+            if key in merged:
+                merged[key]['total_movimientos'] += row['total_movimientos']
+                merged[key]['total_unidades'] += row['total_unidades'] or 0
+            else:
+                merged[key] = {
+                    'linea_nombre': row['linea_nombre'],
+                    'area_nombre': row['area_nombre'],
+                    'total_movimientos': row['total_movimientos'],
+                    'total_unidades': row['total_unidades'] or 0,
+                }
 
         return Response({
             'dias': dias,
             'linea': linea_filter,
-            'data': list(consumo),
+            'data': sorted(merged.values(), key=lambda x: (-x['total_unidades'], x['linea_nombre'])),
         })

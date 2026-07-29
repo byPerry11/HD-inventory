@@ -11,6 +11,25 @@ export const printVale = (vale) => {
   // Usamos una ruta relativa que funcione si el frontend y backend comparten host.
   const templateUrl = '/media/Templates/vale%20de%20salida%20template.png'
 
+  const items = (vale.items && vale.items.length > 0) ? vale.items : [vale]
+
+  const rowsHtml = items.map((item, i) => {
+    const matInfo = item.material_info || item.material || {}
+    const code = matInfo.code || (item.material_info?.code) || ''
+    const name = matInfo.name || (item.material_info?.name) || ''
+    const cant = item.cantidad || ''
+    const cost = item.costo || '0.00'
+    const rowTop = 2.07 + i * 0.32
+    return `
+      <div class="field item-row" style="top: ${rowTop}in;">
+        <span class="item-no">${code}</span>
+        <span class="item-desc">${name}</span>
+        <span class="item-cant">${cant}</span>
+        <span class="item-costo">$${parseFloat(cost).toFixed(2)}</span>
+      </div>
+    `
+  }).join('')
+
   const html = `
     <!DOCTYPE html>
     <html>
@@ -39,20 +58,18 @@ export const printVale = (vale) => {
           position: absolute;
           font-size: 10pt;
           color: #000;
-          white-space: nowrap;
         }
-        /* Posiciones ajustadas según referencia visual */
         .recibo-no { top: 1.0in; right: 2.0in; font-weight: bold; font-size: 12pt; color: #d00; }
         .empl-no { top: 1.2in; left: 2.34in; }
         .empl-nombre { top: 1.20in; left: 5.6in; width: 3in; overflow: hidden; }
         .seccion { top: 1.43in; left: 2.0in; }
         .fecha { top: 1.43in; left: 5.5in; }
         
-        /* Tabla de materiales - Fila 1 */
-        .item-no { top: 2.07in; left: 0.93in; width: 0.4in; text-align: center; }
-        .item-desc { top: 2.07in; left: 1.8in; width: 4.5in; }
-        .item-cant { top: 2.08in; left: 5.7in; width: 0.7in; text-align: center; }
-        .item-costo { top: 2.08in; left: 6.4in; width: 0.7in; text-align: center; }
+        .item-row { left: 0.5in; right: 0.3in; height: 0.28in; display: flex; align-items: center; }
+        .item-no { width: 0.8in; text-align: center; display: inline-block; }
+        .item-desc { width: 4.2in; display: inline-block; overflow: hidden; white-space: nowrap; }
+        .item-cant { width: 0.8in; text-align: center; display: inline-block; }
+        .item-costo { width: 0.7in; text-align: center; display: inline-block; }
         
         .observaciones {
           top: 3.45in;
@@ -80,11 +97,7 @@ export const printVale = (vale) => {
         <div class="field seccion">${vale.area_nombre || ''} / ${vale.seccion_nombre || ''}</div>
         <div class="field fecha">${new Date(vale.fecha).toLocaleDateString()}</div>
         
-        <!-- Fila de material -->
-        <div class="field item-no">${vale.material_info?.code || ''}</div>
-        <div class="field item-desc">${vale.material_info?.name || ''}</div>
-        <div class="field item-cant">${vale.cantidad || ''}</div>
-        <div class="field item-costo">$${vale.costo || '0.00'}</div>
+        ${rowsHtml}
         
         <div class="field observaciones">${vale.observaciones || ''}</div>
       </div>
@@ -92,7 +105,6 @@ export const printVale = (vale) => {
         window.onload = () => {
           setTimeout(() => {
             window.print();
-            // window.close(); // Opcional: cerrar tras imprimir
           }, 500);
         };
       </script>

@@ -1,7 +1,7 @@
 """inventory/serializers.py"""
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import Entrada, Salida, Area, Linea, TURNO_CHOICES, Vale, Empleado
+from .models import Entrada, Salida, Area, Linea, TURNO_CHOICES, Vale, ValeItem, Empleado
 from apps.materials.serializers import MaterialListSerializer
 
 User = get_user_model()
@@ -118,12 +118,27 @@ class SalidaSerializer(serializers.ModelSerializer):
 
 
 
+class ValeItemSerializer(serializers.ModelSerializer):
+    """Serializer para artículos individuales de un Vale."""
+    material_info = MaterialListSerializer(source='material', read_only=True)
+
+    class Meta:
+        model = ValeItem
+        fields = ['id', 'material', 'material_info', 'cantidad', 'costo']
+
+    def validate_cantidad(self, value):
+        if value <= 0:
+            raise serializers.ValidationError('La cantidad debe ser mayor a 0.')
+        return value
+
+
 class ValeSerializer(serializers.ModelSerializer):
-    """Serializer para Vales"""
+    """Serializer para Vales (con soporte multi-artículo vía items)."""
     material_info = MaterialListSerializer(source='material', read_only=True)
     registrado_por_nombre = serializers.SerializerMethodField()
     linea_nombre = serializers.ReadOnlyField(source='linea.nombre')
     area_nombre = serializers.ReadOnlyField(source='area.nombre')
+    items = ValeItemSerializer(many=True, required=False)
 
     class Meta:
         model = Vale
@@ -133,11 +148,15 @@ class ValeSerializer(serializers.ModelSerializer):
             'area', 'area_nombre', 'salida',
             'fecha', 'material', 'material_info', 'aut', 'cantidad', 'costo', 'observaciones',
             'registrado_por', 'registrado_por_nombre',
-            'firma_supervisor', 'firma_gerente', 'firma_empleado', 'firma_entrega',
+            'firma_supervisor', 'firma_supervisor_nombre',
+            'firma_gerente', 'firma_gerente_nombre',
+            'firma_empleado', 'firma_empleado_nombre',
+            'firma_entrega', 'firma_entrega_nombre',
+            'items',
         ]
         read_only_fields = [
-            'id', 'fecha', 'registrado_por', 'material_info', 
-            'registrado_por_nombre', 'recibo_no',
+            'id', 'registrado_por', 'material_info', 
+            'registrado_por_nombre',
             'linea_nombre', 'area_nombre',
         ]
 
@@ -147,20 +166,37 @@ class ValeSerializer(serializers.ModelSerializer):
             return obj.registrado_por.get_full_name() or obj.registrado_por.username
         return None
 
-    def create(self, validated_data):
-        validated_data['registrado_por'] = self.context['request'].user
-        
-        # Lógica de auto-registro de empleado
-        empleado_no = validated_data.get('empleado_no')
-        nombre = validated_data.get('empleado_nombre')
+    def _persist_empleado(self, data):
+        empleado_no = data.get('empleado_no')
+        nombre = data.get('empleado_nombre')
         if empleado_no and nombre:
             Empleado.objects.update_or_create(
                 numero=empleado_no,
                 defaults={'nombre': nombre}
             )
 
-        # Asegurar costo desde material si no viene
-        material = validated_data.get('material')
-        if material and not validated_data.get('costo'):
-            validated_data['costo'] = 0
-        return super().create(validated_data)
+    def create(self, validated_data):
+        items_data = validated_data.pop('items', [])
+        validated_data['registrado_por'] = self.context['request'].user
+
+        self._persist_empleado(validated_data)
+
+        vale = super().create(validated_data)
+
+        for item_data in items_data:
+            ValeItem.objects.create(vale=vale, **item_data)
+
+        return vale
+
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop('items', None)
+        self._persist_empleado(validated_data)
+
+        vale = super().update(instance, validated_data)
+
+        if items_data is not None:
+            vale.items.all().delete()
+            for item_data in items_data:
+                ValeItem.objects.create(vale=vale, **item_data)
+
+        return vale

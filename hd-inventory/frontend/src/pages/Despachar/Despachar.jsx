@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { usePersistentState } from '../../hooks/usePersistentState'
 import client from '../../api/client'
 import { cleanBadgeID } from '../../utils/formatters'
@@ -11,7 +11,7 @@ export default function Despachar() {
   const { user } = useAuth()
   const isPrivileged = user?.role === 'manager' || user?.role === 'supervisor'
 
-  const [materials, setMaterials] = useState([])
+  const [searchResults, setSearchResults] = useState([])
   const [categories, setCategories] = useState([])
   const [selectedCategory, setSelectedCategory] = usePersistentState('hd_desp_cat', '')
   const [cart, setCart] = usePersistentState('hd_desp_cart', [])
@@ -19,27 +19,47 @@ export default function Despachar() {
   const [search, setSearch] = usePersistentState('hd_desp_search', '')
   const [showVale, setShowVale] = useState(false)
   const searchInputRef = useRef(null)
+  const searchTimer = useRef(null)
 
   // Opciones
   const [lineas, setLineas] = useState([])
   const [turnos, setTurnos] = useState([])
-  const [allAreas, setAllAreas] = useState([]) // Todas las áreas del servidor
-  const [filteredAreas, setFilteredAreas] = useState([]) // Áreas filtradas por línea
+  const [allAreas, setAllAreas] = useState([])
+  const [filteredAreas, setFilteredAreas] = useState([])
 
   // Formularios con persistencia
   const [config, setConfig] = usePersistentState('hd_despachar_config', { linea: '', area: '', turno: '', empleado_no: '', recibio: '', observaciones: '' }, 'local')
 
+  const fetchMaterials = useCallback(async (query, categoryId) => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (query) params.set('search', query)
+      if (categoryId) params.set('category', categoryId)
+      params.set('page_size', '50')
+      const { data } = await client.get(`/materials/?${params.toString()}`)
+      setSearchResults(data.results || data)
+    } catch { /* ignore */ } finally { setLoading(false) }
+  }, [])
+
   useEffect(() => {
     fetchData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Load initial materials and search when search/category changes
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    searchTimer.current = setTimeout(() => {
+      fetchMaterials(search || undefined, selectedCategory || undefined)
+    }, 300)
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current) }
+  }, [search, selectedCategory, fetchMaterials])
 
   // Filtrar áreas cuando cambia la línea seleccionada
   useEffect(() => {
     if (config.linea) {
       const filtered = allAreas.filter(a => a.linea === parseInt(config.linea))
       setFilteredAreas(filtered)
-      // Si el área seleccionada no pertenece a la nueva línea, limpiarla
       if (config.area && !filtered.find(a => a.id === parseInt(config.area))) {
         setConfig(prev => ({ ...prev, area: '' }))
       }
@@ -47,7 +67,6 @@ export default function Despachar() {
       setFilteredAreas([])
       setConfig(prev => ({ ...prev, area: '' }))
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.linea, allAreas])
 
   const lookupEmpleado = async (numero) => {
@@ -79,12 +98,10 @@ export default function Despachar() {
 
   const fetchData = async () => {
     try {
-      const [matRes, optsRes, catRes] = await Promise.all([
-        client.get('/materials/?page_size=2000'),
+      const [optsRes, catRes] = await Promise.all([
         client.get('/inventory/salidas/choices/'),
         client.get('/materials/categorias/'),
       ])
-      setMaterials(matRes.data.results || matRes.data)
       setLineas(optsRes.data.lineas || [])
       setTurnos(optsRes.data.turnos || [])
       setCategories(catRes.data.results || catRes.data)
@@ -93,6 +110,14 @@ export default function Despachar() {
       console.error('Error fetching despachar data:', err)
       notify.error('No se pudo cargar el catálogo de materiales.')
     }
+  }
+
+  const lookupMaterialByCode = async (code) => {
+    try {
+      const { data } = await client.get(`/materials/?search=${encodeURIComponent(code)}&page_size=1`)
+      const results = data.results || data
+      return results.length > 0 ? results[0] : null
+    } catch { return null }
   }
 
   // Escáner Global
@@ -128,16 +153,22 @@ export default function Despachar() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [materials])
+  }, [searchResults])
 
-  const handleScan = (code) => {
-    const matched = materials.find(m =>
+  const handleScan = async (code) => {
+    // First try in current results
+    const localMatch = searchResults.find(m =>
       (m.barcode && m.barcode.toLowerCase() === code.toLowerCase()) ||
       (m.code && m.code.toLowerCase() === code.toLowerCase())
     )
-    if (matched) {
-      addToCart(matched)
+    if (localMatch) {
+      addToCart(localMatch)
+      return
+    }
+    // Fallback: server lookup
+    const serverMatch = await lookupMaterialByCode(code)
+    if (serverMatch) {
+      addToCart(serverMatch)
     } else {
       notify.warning(`No se encontró material con código: ${code}`)
     }
@@ -172,7 +203,6 @@ export default function Despachar() {
       return
     }
 
-    // Animación
     if (e && e.currentTarget) {
       triggerFlyAnimation(e.currentTarget)
     }
@@ -234,7 +264,6 @@ export default function Despachar() {
       return
     }
 
-    // Validar cantidades antes de enviar
     for (const item of cart) {
       if (!item.cantidad || item.cantidad < 1) {
         notify.warning(`Cantidad inválida para ${item.material.code}`)
@@ -256,7 +285,7 @@ export default function Despachar() {
       await client.post('/inventory/salidas/bulk/', payload)
 
       setCart([])
-      await fetchData()
+      fetchMaterials(search || undefined, selectedCategory || undefined)
       notify.success(`${cart.length} salida${cart.length > 1 ? 's' : ''} registrada${cart.length > 1 ? 's' : ''} correctamente.`)
     } catch (err) {
       console.error(err)
@@ -265,15 +294,6 @@ export default function Despachar() {
       setLoading(false)
     }
   }
-
-  // Filtrado del catálogo
-  const filteredMaterials = materials.filter(m => {
-    const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) ||
-                          m.code.toLowerCase().includes(search.toLowerCase()) ||
-                          (m.barcode && m.barcode.toLowerCase().includes(search.toLowerCase()))
-    const matchesCategory = selectedCategory === '' || m.category_name === selectedCategory
-    return matchesSearch && matchesCategory
-  })
 
   return (
     <div className="despachar-layout">
@@ -333,30 +353,38 @@ export default function Despachar() {
         </div>
 
         <div className="catalog-grid">
-          {filteredMaterials.map(m => (
-            <div key={m.id} className="catalog-item" onClick={(e) => addToCart(m, e)}>
-              <div className="catalog-item-img-wrapper">
-                {m.image ? (
-                  <img src={m.image} alt={m.name} className="catalog-item-img" />
-                ) : (
-                  <span className="catalog-item-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-                  </span>
-                )}
+          {loading && searchResults.length === 0 ? <div className="loading-container"><div className="spinner" /></div> : (
+            searchResults.length === 0 ? (
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                {search || selectedCategory ? 'Sin resultados' : 'Escribe para buscar materiales...'}
               </div>
-              <div className="catalog-item-code">{m.code}</div>
-              <div className="catalog-item-name">{m.name}</div>
-              {m.ubicacion && (
-                <div className="catalog-item-location">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                  {m.ubicacion}
+            ) : (
+              searchResults.map(m => (
+                <div key={m.id} className="catalog-item" onClick={(e) => addToCart(m, e)}>
+                  <div className="catalog-item-img-wrapper">
+                    {m.image ? (
+                      <img src={m.image} alt={m.name} className="catalog-item-img" />
+                    ) : (
+                      <span className="catalog-item-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                      </span>
+                    )}
+                  </div>
+                  <div className="catalog-item-code">{m.code}</div>
+                  <div className="catalog-item-name">{m.name}</div>
+                  {m.ubicacion && (
+                    <div className="catalog-item-location">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                      {m.ubicacion}
+                    </div>
+                  )}
+                  <div className={`catalog-item-stock stock-badge--${m.estado}`}>
+                    Stock: {m.stock_actual} {m.unit}
+                  </div>
                 </div>
-              )}
-              <div className={`catalog-item-stock stock-badge--${m.estado}`}>
-                Stock: {m.stock_actual} {m.unit}
-              </div>
-            </div>
-          ))}
+              ))
+            )
+          )}
         </div>
       </div>
 
@@ -496,4 +524,3 @@ export default function Despachar() {
     </div>
   )
 }
-

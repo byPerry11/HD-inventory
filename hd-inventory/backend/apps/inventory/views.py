@@ -1,155 +1,79 @@
 """inventory/views.py"""
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from django.db import transaction
+from django.db.models import F
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.filters import OrderingFilter, SearchFilter
-from django.utils import timezone
-from datetime import timedelta
+from rest_framework import viewsets, status, filters
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
-from .models import Entrada, Salida, Area, Linea, TURNO_CHOICES, Vale, Empleado
+from .models import Entrada, Salida, Vale, ValeItem, Linea, Area, Empleado
 from .serializers import (
-    EntradaSerializer, SalidaSerializer, AreaSerializer, 
-    ValeSerializer, EmpleadoSerializer, LineaSerializer
+    EntradaSerializer, SalidaSerializer, ValeSerializer,
+    LineaSerializer, AreaSerializer, EmpleadoSerializer,
 )
-from .filters import SalidaFilter, EntradaFilter
-from apps.accounts.permissions import IsSupervisorOrAboveOrReadOnly
+from apps.accounts.permissions import IsSupervisorOrAboveOrReadOnly, IsCapturistaOrAboveOrReadOnly
 
 
-class AreaViewSet(viewsets.ModelViewSet):
-    """
-    Gestión de catálogo de Área.
-    Solo managers/supervisores pueden crear/editar/eliminar.
-    Cualquier autenticado puede listar.
-    """
-    queryset = Area.objects.all().order_by('linea__nombre', 'nombre')
-    serializer_class = AreaSerializer
-    permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['linea']
-
-    def check_permissions(self, request):
-        super().check_permissions(request)
-        if request.method not in ['GET', 'HEAD', 'OPTIONS'] and request.user.role not in ['manager', 'supervisor']:
-            self.permission_denied(request, message="Solo supervisores o managers pueden modificar áreas.")
-
-
-class EmpleadoViewSet(viewsets.ModelViewSet):
-    """
-    Gestión de catálogo de Empleados para auto-completado.
-    """
+class EmpleadoViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Empleado.objects.all().order_by('numero')
     serializer_class = EmpleadoSerializer
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['numero']
+    search_fields = ['numero', 'nombre']
 
 
-class LineaViewSet(viewsets.ModelViewSet):
-    """
-    Gestión de catálogo de Líneas.
-    Solo managers/supervisores pueden crear/editar/eliminar.
-    """
-    queryset = Linea.objects.all().order_by('nombre')
+class LineaViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Linea.objects.all()
     serializer_class = LineaSerializer
     permission_classes = [IsAuthenticated]
 
-    def check_permissions(self, request):
-        super().check_permissions(request)
-        if request.method not in ['GET', 'HEAD', 'OPTIONS'] and request.user.role not in ['manager', 'supervisor']:
-            self.permission_denied(request, message="Solo supervisores o managers pueden modificar líneas.")
+
+class AreaViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Area.objects.select_related('linea').all()
+    serializer_class = AreaSerializer
+    permission_classes = [IsAuthenticated]
 
 
 class EntradaViewSet(viewsets.ModelViewSet):
-    """
-    Registro de entradas de material al almacén.
-    Todos los usuarios autenticados pueden crear entradas.
-    Solo managers/supervisors pueden eliminar.
-    """
     queryset = Entrada.objects.select_related('material', 'registrado_por').order_by('-fecha')
     serializer_class = EntradaSerializer
-    permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_class = EntradaFilter
-    ordering_fields = ['fecha', 'cantidad']
+    permission_classes = [IsAuthenticated, IsCapturistaOrAboveOrReadOnly]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['material', 'registrado_por', 'proveedor']
+    search_fields = ['material__code', 'material__name', 'proveedor', 'numero_orden']
+    ordering_fields = ['fecha', 'material__code']
+    ordering = ['-fecha']
 
-    def destroy(self, request, *args, **kwargs):
-        if request.user.role not in ('manager', 'supervisor'):
-            return Response(
-                {'detail': 'Solo managers o supervisores pueden eliminar registros.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        return super().destroy(request, *args, **kwargs)
+    def perform_create(self, serializer):
+        serializer.save(registrado_por=self.request.user)
 
 
 class SalidaViewSet(viewsets.ModelViewSet):
-    """
-    Registro de salidas de material del almacén.
-    Todos los usuarios autenticados pueden registrar salidas.
-    """
-    queryset = Salida.objects.select_related('material', 'registrado_por', 'linea', 'area').order_by('-fecha')
+    queryset = Salida.objects.select_related(
+        'material', 'registrado_por', 'linea', 'area'
+    ).order_by('-fecha')
     serializer_class = SalidaSerializer
-    permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_class = SalidaFilter
-    ordering_fields = ['fecha', 'cantidad', 'linea']
+    permission_classes = [IsAuthenticated, IsCapturistaOrAboveOrReadOnly]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['material', 'linea', 'area', 'turno', 'registrado_por']
+    search_fields = ['material__code', 'material__name', 'recibio', 'empleado_no']
+    ordering_fields = ['fecha', 'material__code']
+    ordering = ['-fecha']
 
-    def destroy(self, request, *args, **kwargs):
-        if request.user.role not in ('manager', 'supervisor'):
-            return Response(
-                {'detail': 'Solo managers o supervisores pueden eliminar registros.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        return super().destroy(request, *args, **kwargs)
+    def perform_create(self, serializer):
+        serializer.save(registrado_por=self.request.user)
 
-    @action(detail=False, methods=['post'], url_path='bulk')
-    def bulk(self, request):
-        """Registra múltiples salidas apuntando al mismo destino."""
-        items = request.data.get('items', [])
-        linea_id = request.data.get('linea')
-        area_id = request.data.get('area')
-        turno = request.data.get('turno')
-        recibio = request.data.get('recibio')
-
-        if not items or not linea_id or not turno or not recibio:
-            return Response(
-                {'detail': 'Faltan datos obligatorios (items, linea, turno, recibio).'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        from django.db import transaction
-        created_salidas = []
-        try:
-            with transaction.atomic():
-                for item in items:
-                    data = {
-                        'material': item.get('material'),
-                        'cantidad': item.get('cantidad'),
-                        'linea': linea_id,
-                        'area': area_id,
-                        'turno': turno,
-                        'recibio': recibio,
-                        'observaciones': item.get('observaciones', '')
-                    }
-                    serializer = self.get_serializer(data=data)
-                    serializer.is_valid(raise_exception=True)
-                    created_salidas.append(serializer.save())
-            
-            return Response({'detail': f'{len(created_salidas)} salidas registradas.'}, status=status.HTTP_201_CREATED)
-        except Exception as e:
-            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-    @action(detail=False, methods=['get'], url_path='choices')
+    @action(detail=False, methods=['get'])
     def choices(self, request):
-        """Retorna las opciones dinámicas de línea, área y turno."""
-        lineas = Linea.objects.all().order_by('nombre')
-        areas = Area.objects.all().order_by('linea__nombre', 'nombre')
-        
+        lineas = Linea.objects.values_list('id', 'nombre')
+        areas = Area.objects.select_related('linea').values('id', 'nombre', 'linea')
+        turnos = Salida._meta.get_field('turno').choices
         return Response({
-            'lineas': [{'value': l.id, 'label': l.nombre} for l in lineas],
-            'areas': [{'value': a.id, 'label': a.nombre, 'linea': a.linea_id} for a in areas],
-            'turnos': [{'value': v, 'label': l} for v, l in TURNO_CHOICES],
+            'lineas': [{'value': l[0], 'label': l[1]} for l in lineas],
+            'areas': [{'value': a['id'], 'label': a['nombre'], 'linea': a['linea']} for a in areas],
+            'turnos': [{'value': t[0], 'label': t[1]} for t in turnos],
         })
 
 
@@ -158,17 +82,62 @@ class ValeViewSet(viewsets.ModelViewSet):
     Gestión de Vales (comprobantes de salida basados en recibo).
     Lectura: cualquier autenticado.
     Escritura/Borrado: solo supervisores y managers.
+
+    DELETE con ?return_stock=true devuelve el material al inventario.
     """
-    queryset = Vale.objects.select_related('material', 'registrado_por', 'linea', 'area').order_by('-fecha')
+    queryset = Vale.objects.select_related(
+        'material', 'registrado_por', 'linea', 'area'
+    ).prefetch_related('items__material').order_by('-fecha')
     serializer_class = ValeSerializer
     permission_classes = [IsAuthenticated, IsSupervisorOrAboveOrReadOnly]
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['material', 'registrado_por', 'recibo_no', 'linea', 'area']
     search_fields = ['recibo_no', 'empleado_no', 'empleado_nombre', 'material__code', 'material__name']
     ordering_fields = ['fecha', 'recibo_no']
 
+    def _reverse_stock(self, vale):
+        """Devuelve al stock los materiales de un vale."""
+        items = vale.items.all()
+        if items.exists():
+            for item in items:
+                with transaction.atomic():
+                    material = item.material
+                    material.stock_actual = F('stock_actual') + item.cantidad
+                    material.save(update_fields=['stock_actual', 'actualizado_en'])
+                    material.refresh_from_db(fields=['stock_actual'])
+        elif vale.material:
+            with transaction.atomic():
+                material = vale.material
+                material.stock_actual = F('stock_actual') + vale.cantidad
+                material.save(update_fields=['stock_actual', 'actualizado_en'])
+                material.refresh_from_db(fields=['stock_actual'])
+
     def destroy(self, request, *args, **kwargs):
-        if request.user.role not in ('manager', 'supervisor'):
-            return Response({'detail': 'Solo supervisores o managers pueden eliminar vales.'}, status=status.HTTP_403_FORBIDDEN)
+        vale = self.get_object()
+        return_stock = request.query_params.get('return_stock', '') == 'true'
+        if return_stock:
+            self._reverse_stock(vale)
         return super().destroy(request, *args, **kwargs)
 
+    def perform_update(self, serializer):
+        """
+        Ajusta el stock cuando cambia la cantidad de un vale legacy
+        (material único, sin items).
+        """
+        instance = self.get_object()
+        old_cantidad = instance.cantidad or 0
+        old_material = instance.material
+
+        vale = serializer.save()
+
+        # Solo ajuste automático para vales legacy (sin items)
+        if old_material and not vale.items.exists():
+            new_cantidad = vale.cantidad or 0
+            diff = old_cantidad - new_cantidad
+            if diff != 0:
+                with transaction.atomic():
+                    material = vale.material
+                    material.stock_actual = F('stock_actual') + diff
+                    material.save(update_fields=['stock_actual', 'actualizado_en'])
+                    material.refresh_from_db(fields=['stock_actual'])
+        return vale
