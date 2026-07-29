@@ -50,15 +50,12 @@ export default function Materiales() {
           </h1>
           <p className="page-subtitle">Catálogo del almacén — {count} materiales</p>
         </div>
-        {(isManager || user?.role === 'supervisor') && (
           <button 
             className="btn btn-primary"
             onClick={() => { setModalMaterial(null); setIsModalOpen(true); }}
           >
             + Nuevo Material
           </button>
-        )}
-        {(isManager || user?.role === 'supervisor') && (
           <button
             className="btn btn-secondary"
             style={{ marginLeft: 8 }}
@@ -66,7 +63,6 @@ export default function Materiales() {
           >
             Generar reporte
           </button>
-        )}
       </div>
 
       {/* ─── Filtros ───────────────────────────────────── */}
@@ -111,7 +107,7 @@ export default function Materiales() {
                 <th className="text-right">Mínimo</th>
                 <th className="text-right">Crítico</th>
                 <th>Estado</th>
-                {(isManager || user?.role === 'supervisor') && <th>Acciones</th>}
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -140,17 +136,15 @@ export default function Materiales() {
                         {m.estado_label}
                       </span>
                     </td>
-                    {(isManager || user?.role === 'supervisor') && (
-                      <td>
-                        <button 
-                          className="btn btn-secondary" 
-                          style={{ padding: '4px 8px', fontSize: '0.8rem' }}
-                          onClick={() => { setModalMaterial(m); setIsModalOpen(true); }}
-                        >
-                          Editar
-                        </button>
-                      </td>
-                    )}
+                    <td>
+                      <button 
+                        className="btn btn-secondary" 
+                        style={{ padding: '4px 8px', fontSize: '0.8rem' }}
+                        onClick={() => { setModalMaterial(m); setIsModalOpen(true); }}
+                      >
+                        Editar
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}

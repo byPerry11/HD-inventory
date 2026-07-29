@@ -1,6 +1,7 @@
 """purchases/views.py — ViewSet de Órdenes de Compra y Proveedores."""
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
@@ -34,6 +35,11 @@ class OrdenCompraViewSet(viewsets.ModelViewSet):
     ordering_fields    = ['fecha_emision', 'status', 'costo_unitario', 'actualizado_en']
     ordering           = ['-fecha_emision']
 
+    def get_permissions(self):
+        if self.action == 'destroy':
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
     def get_serializer_class(self):
         if self.action == 'list':
             return OrdenCompraListSerializer
@@ -44,6 +50,26 @@ class OrdenCompraViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         serializer.save(actualizado_por=self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Eliminación lógica: cancela la orden si está en estado cancelable.
+        Cualquier usuario autenticado puede ejecutar esta acción.
+        """
+        instance = self.get_object()
+
+        if instance.status not in OrdenCompra.ESTADOS_CANCELABLE:
+            return Response(
+                {"error": f"No se puede eliminar una orden en estado {instance.get_status_display()}."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        instance.status = 'cancelado'
+        instance.actualizado_por = request.user
+        instance.save()
+
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
     def update(self, request, *args, **kwargs):
         """

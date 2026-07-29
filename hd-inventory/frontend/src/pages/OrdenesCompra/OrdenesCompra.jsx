@@ -159,14 +159,17 @@ export default function OrdenesCompra() {
     }
   }
 
-  const handleCancelOrder = async (id) => {
-    if (!window.confirm('¿Estás seguro de que deseas cancelar esta orden?')) return
+  const handleDeleteOrder = async (id) => {
+    const ok = window.confirm(
+      '¿Eliminar orden de compra?\n\nEsta acción cancelará la orden y no se puede deshacer. Los registros de entrada/salida asociados no se verán afectados. ¿Deseas continuar?'
+    )
+    if (!ok) return
     try {
-      await api.post(`/purchases/ordenes/${id}/cancel/`)
+      await api.delete(`/purchases/ordenes/${id}/`)
       notify.success('Orden cancelada')
       fetchOrdenes()
     } catch (err) {
-      notify.error(err.response?.data?.error || 'No se pudo cancelar la orden')
+      notify.error(err.response?.data?.error || 'No se pudo eliminar la orden')
     }
   }
 
@@ -423,11 +426,11 @@ export default function OrdenesCompra() {
 
                     <td>
                       <div className="row-actions">
-                        {!isCerrada && !isCapturista && (
+                        {!isCerrada && (
                           <button 
                             className="btn-icon text-urge" 
-                            title="Cancelar Orden"
-                            onClick={() => handleCancelOrder(orden.id)}
+                            title="Cancelar/Eliminar Orden"
+                            onClick={() => handleDeleteOrder(orden.id)}
                           >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
                           </button>

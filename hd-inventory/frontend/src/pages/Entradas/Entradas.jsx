@@ -24,7 +24,6 @@ const EMPTY_NEW_MATERIAL = {
 
 export default function Entradas() {
   const { user } = useAuth()
-  const canCreateMaterial = user?.role === 'manager' || user?.role === 'supervisor'
 
   const [form, setForm]           = usePersistentState('hd_entr_form', EMPTY_FORM)
   const [searchResults, setSearchResults] = useState([])
@@ -93,11 +92,9 @@ export default function Entradas() {
             <h1 className="page-title">Entrada de Materiales</h1>
             <p className="page-subtitle">Registra el ingreso de material al almacén</p>
           </div>
-          {canCreateMaterial && (
-            <button className="btn btn-primary" onClick={() => setShowNewMaterial(true)}>
-              + Nuevo Material
-            </button>
-          )}
+          <button className="btn btn-primary" onClick={() => setShowNewMaterial(true)}>
+            + Nuevo Material
+          </button>
         </div>
       </div>
 

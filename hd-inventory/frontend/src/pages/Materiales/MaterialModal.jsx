@@ -145,6 +145,21 @@ export default function MaterialModal({ material, onClose, onSaved }) {
     }
   }
 
+  const handleDelete = async () => {
+    const ok = window.confirm(
+      `¿Desactivar material "${formData.name}"?\n\nAl desactivarlo se ocultará del inventario, pero los registros históricos (entradas, salidas, vales, órdenes de compra) se conservarán. ¿Deseas continuar?`
+    )
+    if (!ok) return
+    setLoading(true)
+    try {
+      await client.delete(`/materials/${material.id}/`)
+      notify.success(`Material "${formData.name}" desactivado.`)
+      onSaved()
+    } catch (err) {
+      notify.error('Error al desactivar el material.')
+    } finally { setLoading(false) }
+  }
+
   return (
     <div className="modal-backdrop" onClick={onClose} onPaste={handlePaste}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -314,6 +329,13 @@ export default function MaterialModal({ material, onClose, onSaved }) {
           </div>
 
           <div className="modal-footer">
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginRight: 'auto' }}>
+              {isEdit && (
+                <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={loading}>
+                  Eliminar
+                </button>
+              )}
+            </div>
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={loading}>
               Cancelar
             </button>
