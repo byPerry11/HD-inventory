@@ -1,7 +1,11 @@
-**/hdinvetory
 **/node_modules
 **/.git
 **/.next
 **/dist
-**/.gemini
+**/__pycache__
+**/*.pyc
 **/db.sqlite3
+**.env*
+**/.venv
+**/venv
+**/respaldo de inventario para cargar

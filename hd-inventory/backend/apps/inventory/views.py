@@ -76,6 +76,39 @@ class SalidaViewSet(viewsets.ModelViewSet):
             'turnos': [{'value': t[0], 'label': t[1]} for t in turnos],
         })
 
+    @action(detail=False, methods=['post'])
+    def bulk(self, request):
+        """Crear múltiples salidas en una sola request (desde el carrito de despacho)."""
+        items = request.data.get('items', [])
+        if not items:
+            return Response({'detail': 'No hay items en la solicitud.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        registros = []
+        errores = []
+
+        for item in items:
+            data = {
+                'material': item.get('material'),
+                'cantidad': item.get('cantidad'),
+                'linea': request.data.get('linea'),
+                'area': request.data.get('area'),
+                'turno': request.data.get('turno'),
+                'empleado_no': request.data.get('empleado_no'),
+                'recibio': request.data.get('recibio'),
+                'observaciones': item.get('observaciones', request.data.get('observaciones', '')),
+            }
+            serializer = self.get_serializer(data=data)
+            if serializer.is_valid():
+                self.perform_create(serializer)
+                registros.append(serializer.data)
+            else:
+                errores.append({'item': item, 'errors': serializer.errors})
+
+        if errores:
+            return Response({'registrados': registros, 'errors': errores}, status=status.HTTP_207_MULTI_STATUS)
+
+        return Response(registros, status=status.HTTP_201_CREATED)
+
 
 class ValeViewSet(viewsets.ModelViewSet):
     """
