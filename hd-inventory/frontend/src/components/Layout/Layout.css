@@ -27,6 +27,11 @@
   filter: drop-shadow(0 0 8px #1f6feb88);
 }
 
+.sidebar-logo-btn {
+  color: var(--color-accent-hover);
+  filter: drop-shadow(0 0 8px rgba(31, 111, 235, 0.5));
+}
+
 .sidebar-title {
   font-size: var(--font-size-base);
   font-weight: 700;

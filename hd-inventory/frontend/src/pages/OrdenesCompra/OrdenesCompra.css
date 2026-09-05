@@ -66,7 +66,7 @@
 }
 
 .ordenes-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--color-bg-hover);
 }
 
 /* Status Cell & Stepper */
@@ -126,12 +126,12 @@
 }
 
 .step-dot.is-done {
-  background: var(--color-primary);
+  background: var(--color-accent);
 }
 
 .step-dot.is-active {
-  background: var(--color-primary);
-  box-shadow: 0 0 8px var(--color-primary);
+  background: var(--color-accent);
+  box-shadow: 0 0 8px var(--color-accent);
 }
 
 /* Transition Visual in Modal */
@@ -159,8 +159,8 @@
 }
 
 .step-box.next {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 20px rgba(31, 111, 235, 0.15);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 20px var(--color-accent-subtle);
 }
 
 .step-label {
@@ -180,33 +180,15 @@
   color: var(--color-text-secondary);
 }
 
-/* Row Actions */
+/* Row Actions — usa .btn-icon global (index.css) */
 .row-actions {
   display: flex;
   align-items: center;
   gap: var(--space-2);
 }
 
-.btn-icon {
-  background: transparent;
-  border: none;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  padding: 6px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.btn-icon:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--color-text);
-}
-
 .btn-icon.text-urge:hover {
-  color: var(--color-urge);
+  color: var(--color-danger);
   background: var(--color-urge-bg);
 }
 
@@ -220,7 +202,7 @@
 .text-center { text-align: center; }
 .fw-500 { font-weight: 500; }
 .fw-600 { font-weight: 600; }
-.font-mono { font-family: var(--font-mono); font-size: 0.8rem; }
+.font-mono { font-family: var(--font-mono); font-size: var(--font-size-sm); }
 
 .truncate-2 {
   display: -webkit-box;
@@ -298,7 +280,6 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(255, 255, 255, 0.01);
 }
 
 .modal-form {
@@ -341,18 +322,18 @@
 
 .input-text, .input-select {
   width: 100%;
-  padding: 10px 14px;
-  background: var(--color-bg);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
-  color: var(--color-text);
-  font-size: 0.95rem;
-  transition: all 0.2s;
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.input-text:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.15);
+.input-text:focus, .input-select:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
   outline: none;
 }
 
@@ -367,12 +348,12 @@
   top: 100%;
   left: 0;
   right: 0;
-  background: #1c2333; /* Usar color sólido para máxima opacidad */
-  border: 1px solid var(--color-primary); /* Resaltar con color primario */
-  border-radius: 8px;
-  z-index: 1100; /* Asegurar que esté sobre todo */
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  z-index: 1100;
   margin-top: 4px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+  box-shadow: var(--shadow-lg);
   max-height: 200px;
   overflow-y: auto;
 }
@@ -386,13 +367,13 @@
 }
 
 .suggestion-item:hover {
-  background: rgba(31, 111, 235, 0.2);
-  border-left: 3px solid var(--color-primary);
+  background: var(--color-accent-subtle);
+  border-left: 3px solid var(--color-accent);
 }
 
 .suggestion-code {
   font-weight: 600;
-  color: var(--color-primary);
+  color: var(--color-accent-hover);
 }
 
 .suggestion-desc {
@@ -503,17 +484,17 @@
 }
 
 .timeline-step.is-done .timeline-dot {
-  background: #3fb950;
+  background: var(--color-success);
   box-shadow: 0 0 8px rgba(63, 185, 80, 0.3);
 }
 
 .timeline-step.is-done .timeline-line {
-  background: #3fb950;
+  background: var(--color-success);
 }
 
 .timeline-step.is-current .timeline-dot {
-  background: var(--color-primary);
-  box-shadow: 0 0 8px var(--color-primary);
+  background: var(--color-accent);
+  box-shadow: 0 0 8px var(--color-accent);
   animation: pulse-dot 2s infinite;
 }
 
@@ -545,14 +526,14 @@
 }
 
 .timeline-step.is-current .timeline-label {
-  color: var(--color-primary);
+  color: var(--color-accent-hover);
   font-weight: 600;
 }
 
 /* Receiver annotation in timeline */
 .timeline-receiver {
   font-size: 0.7rem;
-  color: #3fb950;
+  color: var(--color-success);
   font-weight: 500;
   margin-top: 2px;
   display: flex;
@@ -566,7 +547,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #3fb950;
+  background: var(--color-success);
   flex-shrink: 0;
 }
 

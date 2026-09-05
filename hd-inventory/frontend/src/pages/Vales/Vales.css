@@ -33,7 +33,7 @@
 .vales-filters .filter-label {
   font-size: 0.7rem;
   font-weight: 500;
-  color: var(--text-muted);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
@@ -61,7 +61,7 @@
 }
 
 .vale-row:hover td {
-  background: var(--surface-hover);
+  background: var(--color-bg-hover);
 }
 
 .vale-detail-row td {
@@ -70,8 +70,8 @@
 
 .vale-detail {
   padding: var(--space-4);
-  background: var(--surface-hover);
-  border-bottom: 1px solid var(--border);
+  background: var(--color-bg-hover);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .vale-detail-grid {
@@ -89,14 +89,14 @@
 .vale-detail-field .detail-label {
   font-size: 0.7rem;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
 
 .vale-detail-field .detail-value {
   font-size: 0.9rem;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 /* Signature checkboxes */
@@ -106,7 +106,7 @@
   gap: var(--space-3);
   margin-top: var(--space-3);
   padding-top: var(--space-3);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--color-border);
 }
 
 .signature-item {
@@ -114,9 +114,9 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  background: var(--surface);
+  background: var(--color-bg-card);
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border);
 }
 
 .signature-item label {
@@ -131,7 +131,7 @@
 .signature-item input[type="checkbox"] {
   width: 18px;
   height: 18px;
-  accent-color: #3fb950;
+  accent-color: var(--color-success);
   cursor: pointer;
 }
 
@@ -142,12 +142,12 @@
 }
 
 .signature-item.signed {
-  border-color: #3fb950;
-  background: rgba(63, 185, 80, 0.08);
+  border-color: var(--color-success);
+  background: var(--color-ok-bg);
 }
 
 .signature-item.pending {
-  border-color: var(--border);
+  border-color: var(--color-border);
 }
 
 .detail-actions {
@@ -155,7 +155,7 @@
   gap: var(--space-2);
   margin-top: var(--space-3);
   padding-top: var(--space-3);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--color-border);
 }
 
 /* Pagination */
@@ -165,8 +165,8 @@
   justify-content: space-between;
   padding: var(--space-3) var(--space-4);
   margin-top: var(--space-4);
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   flex-wrap: wrap;
   gap: var(--space-3);
@@ -174,7 +174,7 @@
 
 .vales-pagination .pagination-info {
   font-size: 0.85rem;
-  color: var(--text-muted);
+  color: var(--color-text-secondary);
 }
 
 .vales-pagination .pagination-controls {
@@ -185,8 +185,8 @@
 
 .pagination-count-badge {
   font-size: 0.85rem;
-  color: var(--text-muted);
-  background: var(--surface-hover);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-hover);
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-sm);
   white-space: nowrap;

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import ChatWidget from '../Chat/ChatWidget'
+import Icon from '../ui/Icon'
 import './Layout.css'
 
 const NAV_ITEMS = [
@@ -58,7 +59,9 @@ export default function Layout() {
         {/* Logo / Brand */}
         <div className="sidebar-brand" style={{ justifyContent: isCollapsed ? 'center' : 'space-between', flexDirection: isCollapsed ? 'column' : 'row' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-            <span className="sidebar-logo" title="Almacén PE" style={{ cursor: 'pointer' }} onClick={() => setIsCollapsed(!isCollapsed)}>⬡</span>
+            <button className="btn-icon sidebar-logo-btn" title="Almacén PE — alternar menú" onClick={() => setIsCollapsed(!isCollapsed)} aria-label="Alternar menú">
+              <Icon name="hexagon" size={26} />
+            </button>
             {!isCollapsed && (
               <div>
                 <div className="sidebar-title">Almacén PE</div>
@@ -67,12 +70,13 @@ export default function Layout() {
             )}
           </div>
           {!isCollapsed && (
-            <button 
-              className="btn-toggle-sidebar" 
+            <button
+              className="btn-toggle-sidebar"
               onClick={() => setIsCollapsed(true)}
               title="Ocultar menú"
+              aria-label="Ocultar menú"
             >
-              «
+              <Icon name="chevronLeft" size={18} />
             </button>
           )}
         </div>
@@ -129,8 +133,9 @@ export default function Layout() {
             className="sidebar-logout"
             onClick={handleLogout}
             title="Cerrar sesión"
+            aria-label="Cerrar sesión"
           >
-            ⏻
+            <Icon name="logout" size={16} />
           </button>
         </div>
       </aside>

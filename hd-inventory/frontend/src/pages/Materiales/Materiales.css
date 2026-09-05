@@ -20,29 +20,8 @@
 .materiales-empty {
   text-align: center;
   padding: var(--space-10);
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
 }
 
-/* Simple modal styles for ReportModal */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-}
-.modal-card {
-  background: white;
-  border-radius: 6px;
-  width: 420px;
-  max-width: calc(100% - 32px);
-  box-shadow: 0 6px 24px rgba(0,0,0,0.15);
-  overflow: hidden;
-}
-.modal-header { padding: 12px 16px; border-bottom: 1px solid #eee; }
-.modal-body { padding: 16px; }
-.modal-footer { padding: 12px 16px; border-top: 1px solid #eee; text-align: right; }
-.modal-body ul { list-style: none; padding: 0; margin: 0; }
-.modal-body li { margin-bottom: 8px; }
+/* Los modales usan el sistema global (.modal-backdrop/.modal-content en index.css).
+   No definir .modal-* aquí para no romper dark/light. */

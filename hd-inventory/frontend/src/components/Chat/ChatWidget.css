@@ -1,14 +1,14 @@
 :root {
-  --chat-primary: #1f6feb;
-  --chat-primary-hover: #388bfd;
-  --chat-bg: #0d1117;
-  --chat-card: #161b22;
-  --chat-border: #30363d;
-  --chat-text: #e6edf3;
-  --chat-text-muted: #8b949e;
-  --chat-own-msg: #1f6feb;
-  --chat-other-msg: #21262d;
-  --chat-accent: #238636;
+  --chat-primary: var(--color-accent);
+  --chat-primary-hover: var(--color-accent-hover);
+  --chat-bg: var(--color-bg-primary);
+  --chat-card: var(--color-bg-secondary);
+  --chat-border: var(--color-border);
+  --chat-text: var(--color-text-primary);
+  --chat-text-muted: var(--color-text-secondary);
+  --chat-own-msg: var(--color-accent);
+  --chat-other-msg: var(--color-bg-hover);
+  --chat-accent: var(--color-success);
 }
 
 .chat-widget-container {

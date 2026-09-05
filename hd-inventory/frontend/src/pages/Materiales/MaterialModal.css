@@ -1,129 +1,25 @@
-/* Modal Base */
-.modal-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.6);
-  backdrop-filter: blur(4px);
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-4);
-  animation: fadeIn 0.2s;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.modal-content {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  width: 100%;
-  max-width: 600px;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.modal-header {
-  padding: var(--space-4);
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.modal-header h2 {
-  margin: 0;
-  font-size: 1.25rem;
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 1.5rem;
-  cursor: pointer;
-  padding: var(--space-1);
-  line-height: 1;
-}
-
-.modal-close:hover {
-  color: var(--text-primary);
-}
-
-.modal-body {
-  padding: var(--space-4);
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.modal-footer {
-  padding: var(--space-4);
-  border-top: 1px solid var(--border);
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-  background: var(--surface-hover);
-  border-bottom-left-radius: var(--radius-lg);
-  border-bottom-right-radius: var(--radius-lg);
-}
-
-.form-row {
-  display: flex;
-  gap: var(--space-4);
-}
-
-.flex-1 {
-  flex: 1;
-}
-
-.checkbox-group {
-  margin-top: var(--space-2);
-}
-
-.checkbox-group label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  cursor: pointer;
-  font-weight: normal;
-}
+/* MaterialModal — extensión del modal global (index.css).
+   Solo estilos propios del formulario/imagen. No redefinir .modal-*. */
 
 /* Image Upload section */
 .image-upload-wrapper {
-  border: 2px dashed var(--border);
+  border: 2px dashed var(--color-border);
   padding: var(--space-3);
   border-radius: var(--radius-md);
   text-align: center;
   position: relative;
-  background: var(--surface-hover);
+  background: var(--color-bg-hover);
   transition: all var(--transition-fast);
 }
 
 .image-upload-wrapper:hover {
-  border-color: var(--primary);
+  border-color: var(--color-accent);
 }
 
 .image-upload-wrapper.drag-active {
-  border-color: var(--primary);
-  background: var(--surface);
-  box-shadow: 0 0 0 4px rgba(31, 111, 235, 0.2);
+  border-color: var(--color-accent);
+  background: var(--color-bg-card);
+  box-shadow: 0 0 0 4px var(--color-accent-subtle);
 }
 
 .image-preview {
@@ -140,7 +36,7 @@
   position: absolute;
   top: -8px;
   right: -8px;
-  background: var(--danger);
+  background: var(--color-danger);
   color: white;
   border: none;
   width: 24px;

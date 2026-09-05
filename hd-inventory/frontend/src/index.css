@@ -87,6 +87,19 @@
   --color-bg:            var(--color-bg-primary);
   --color-bg-elevated:   var(--color-bg-card);
   --radius:              var(--radius-md);
+
+  /* Aliases legacy — no usar en código nuevo, solo compatibilidad */
+  --surface:             var(--color-bg-card);
+  --surface-hover:       var(--color-bg-hover);
+  --bg:                  var(--color-bg-card);
+  --primary:             var(--color-accent);
+  --danger:              var(--color-danger);
+  --success:             var(--color-success);
+  --warning:             var(--color-warning);
+  --info:                var(--color-info);
+  --text-primary:        var(--color-text-primary);
+  --text-secondary:      var(--color-text-secondary);
+  --font-mono:           'SF Mono', Consolas, monospace;
 }
 
 [data-theme='light'] {
@@ -606,3 +619,206 @@ select.form-control {
 .mb-8          { margin-bottom: var(--space-8); }
 .w-full        { width: 100%; }
 .sr-only       { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+
+/* ═══════════════════════════════════════════════════════════
+   Patrones compartidos — usar en todas las páginas.
+   Las páginas NO deben redefinir estos bloques.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Encabezado de página estándar ─────────────────────── */
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.page-header-text { min-width: 0; }
+.page-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.page-title svg { opacity: 0.6; flex-shrink: 0; }
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* ─── Filtros compactos (una sola definición) ───────────── */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.filter-group .form-control,
+.filter-group input,
+.filter-group select {
+  width: 160px;
+  font-size: var(--font-size-sm);
+  padding: var(--space-1) var(--space-2);
+  height: 32px;
+}
+.filter-group input[type="datetime-local"] { width: 200px; }
+.filter-label {
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.02em;
+}
+.filter-actions {
+  display: flex;
+  gap: var(--space-1);
+  align-items: flex-end;
+}
+.filter-actions .btn {
+  font-size: var(--font-size-sm);
+  padding: var(--space-1) var(--space-3);
+  height: 32px;
+}
+
+/* ─── Paginación estándar ───────────────────────────────── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  margin-top: var(--space-4);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.pagination-info {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.pagination-count {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-hover);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+.pagination-page {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  padding: 0 var(--space-2);
+}
+.pagination-page-size { width: auto; min-width: 120px; }
+
+/* ─── Botón icono (única definición) ────────────────────── */
+.btn-icon {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  line-height: 1;
+}
+.btn-icon:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+.btn-icon--danger:hover {
+  color: var(--color-danger);
+  background: var(--color-urge-bg);
+}
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--color-accent-hover);
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0;
+}
+.btn-link:hover { text-decoration: underline; }
+
+/* ─── Tabs estándar ─────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: var(--space-2);
+  background: var(--color-bg-hover);
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  width: fit-content;
+}
+.tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+}
+.tab-btn:hover { color: var(--color-text-primary); }
+.tab-btn.active {
+  background: var(--color-bg-card);
+  box-shadow: var(--shadow-sm);
+  color: var(--color-text-primary);
+}
+
+/* ─── Estado vacío ──────────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: var(--space-10);
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+.empty-state svg { opacity: 0.4; }
+
+/* ─── Iconos SVG herencia ───────────────────────────────── */
+.icon { flex-shrink: 0; vertical-align: middle; }
+
+/* ─── Focus visible (accesibilidad) ─────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-accent-hover);
+  outline-offset: 2px;
+}
+
+/* ─── Respeto a movimiento reducido ─────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ─── Responsive base ───────────────────────────────────── */
+@media (max-width: 768px) {
+  .main-content { padding: var(--space-4); }
+  .page-header { flex-direction: column; align-items: stretch; }
+  .page-actions { justify-content: flex-start; }
+  .form-row { flex-direction: column; }
+  .modal-content { max-width: 100%; }
+}
