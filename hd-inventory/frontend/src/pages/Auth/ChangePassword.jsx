@@ -10,6 +10,7 @@ export default function ChangePassword() {
   const navigate = useNavigate()
   const notify = useToast()
 
+  const [currentPassword, setCurrentPassword] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -25,8 +26,9 @@ export default function ChangePassword() {
   const hasLetter = /[a-zA-Z]/.test(password)
   const hasNumber = /[0-9]/.test(password)
   const passwordsMatch = password === confirmPassword && password !== ''
+  const currentPasswordOk = currentPassword !== ''
 
-  const isFormValid = lengthOk && hasLetter && hasNumber && passwordsMatch
+  const isFormValid = lengthOk && hasLetter && hasNumber && passwordsMatch && currentPasswordOk
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -34,15 +36,22 @@ export default function ChangePassword() {
 
     setLoading(true)
     try {
-      await api.patch('/auth/change-password/', { new_password: password })
+      await api.patch('/auth/change-password/', {
+        current_password: currentPassword,
+        new_password: password,
+      })
       notify.success('Contraseña actualizada con éxito. Redirigiendo...')
-      
+
       // Actualizar contexto de auth para refrescar user.must_change_password
       await checkAuth()
       navigate('/')
-      
+
     } catch (err) {
-      notify.error(err.response?.data?.detail || 'Error al actualizar contraseña.')
+      const detail = err.response?.data?.detail
+      const message = Array.isArray(detail)
+        ? detail.join(' ')
+        : (detail || 'Error al actualizar contraseña.')
+      notify.error(message)
     } finally {
       setLoading(false)
     }
@@ -57,6 +66,18 @@ export default function ChangePassword() {
         </div>
 
         <form onSubmit={handleSubmit} className="change-password-form">
+          <div className="form-group">
+            <label className="form-label">Contraseña Actual</label>
+            <input
+              type="password"
+              className="form-control"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Ingresa tu contraseña actual"
+              autoFocus
+            />
+          </div>
+
           <div className="form-group">
             <label className="form-label">Nueva Contraseña</label>
             <input

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { EmojiIcon, AttachIcon, SpinnerIcon, SendIcon } from './ChatIcons'
 import EmojiPicker from './EmojiPicker'
 

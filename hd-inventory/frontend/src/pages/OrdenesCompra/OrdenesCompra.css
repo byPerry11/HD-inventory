@@ -570,3 +570,117 @@
   flex-shrink: 0;
 }
 
+/* Filtros — fila horizontal compacta (igual que Historial) */
+.historial-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.filter-group input,
+.filter-group select {
+  width: 160px;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  height: 30px;
+}
+
+.filter-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.sort-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+.sort-toggle .btn {
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  height: 30px;
+  white-space: nowrap;
+}
+
+.filter-actions {
+  display: flex;
+  gap: var(--space-1);
+  align-items: flex-end;
+  padding-bottom: 1px;
+}
+
+.filter-actions .btn {
+  font-size: 0.8rem;
+  padding: 4px 12px;
+  height: 30px;
+}
+
+.form-section-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-2) 0;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.form-section-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.p-4 { padding: var(--space-4); }
+
+/* Paginación */
+.historial-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  margin-top: var(--space-4);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.pagination-info {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.pagination-page-size {
+  width: auto;
+  min-width: 120px;
+}
+
+.pagination-page {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  padding: 0 var(--space-2);
+}
+

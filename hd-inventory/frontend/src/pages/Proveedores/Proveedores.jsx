@@ -1,35 +1,38 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import api from '../../api/client'
 import { useToast } from '../../context/ToastContext'
 
 export default function Proveedores() {
   const [proveedores, setProveedores] = useState([])
   const [loading, setLoading] = useState(true)
-  const { showToast } = useToast()
+  const notify = useToast()
 
-  useEffect(() => {
-    fetchProveedores()
-  }, [])
-
-  const fetchProveedores = async () => {
+  const fetchProveedores = useCallback(async () => {
     try {
       const { data } = await api.get('/purchases/proveedores/')
       setProveedores(data.results || data)
-    } catch (err) {
-      showToast('Error al cargar proveedores', 'error')
+    } catch {
+      notify.error('Error al cargar proveedores')
     } finally {
       setLoading(false)
     }
-  }
+  }, [notify])
+
+  useEffect(() => {
+    fetchProveedores()
+  }, [fetchProveedores])
 
   return (
     <div className="proveedores-page">
       <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1 className="page-title">Proveedores</h1>
+          <h1 className="page-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Proveedores
+          </h1>
           <p className="page-subtitle">Directorio de vendedores y contactos comerciales</p>
         </div>
-        <button className="btn btn-primary" onClick={() => showToast('Módulo de creación próximamente', 'info')}>
+        <button className="btn btn-primary" onClick={() => notify.info('Módulo de creación próximamente')}>
           + Nuevo Proveedor
         </button>
       </header>

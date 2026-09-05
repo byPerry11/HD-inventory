@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import client from '../../api/client'
 import { useToast } from '../../context/ToastContext'
+import ConfirmModal from '../../components/ConfirmModal'
 import './MaterialModal.css'
 
 export default function MaterialModal({ material, onClose, onSaved }) {
   const isEdit = !!material
   const notify = useToast()
   const [loading, setLoading] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const [categories, setCategories] = useState([])
   const [dragActive, setDragActive] = useState(false)
   const [isNewCategory, setIsNewCategory] = useState(false)
@@ -146,10 +148,6 @@ export default function MaterialModal({ material, onClose, onSaved }) {
   }
 
   const handleDelete = async () => {
-    const ok = window.confirm(
-      `¿Desactivar material "${formData.name}"?\n\nAl desactivarlo se ocultará del inventario, pero los registros históricos (entradas, salidas, vales, órdenes de compra) se conservarán. ¿Deseas continuar?`
-    )
-    if (!ok) return
     setLoading(true)
     try {
       await client.delete(`/materials/${material.id}/`)
@@ -199,7 +197,7 @@ export default function MaterialModal({ material, onClose, onSaved }) {
                   type="button"
                   className="btn-link"
                   onClick={() => setIsNewCategory(!isNewCategory)}
-                  style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '0.85rem' }}
+                  style={{ background: 'none', border: 'none', color: 'var(--color-accent)', cursor: 'pointer', fontSize: '0.85rem' }}
                 >
                   {isNewCategory ? 'Seleccionar existente' : '+ Nueva'}
                 </button>
@@ -331,7 +329,7 @@ export default function MaterialModal({ material, onClose, onSaved }) {
           <div className="modal-footer">
             <div style={{ display: 'flex', gap: 'var(--space-2)', marginRight: 'auto' }}>
               {isEdit && (
-                <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={loading}>
+                <button type="button" className="btn btn-danger" onClick={() => setConfirmOpen(true)} disabled={loading}>
                   Eliminar
                 </button>
               )}
@@ -344,6 +342,16 @@ export default function MaterialModal({ material, onClose, onSaved }) {
             </button>
           </div>
         </form>
+
+        <ConfirmModal
+          open={confirmOpen}
+          title={`¿Desactivar material "${formData.name}"?`}
+          message={`Al desactivarlo se ocultará del inventario, pero los registros históricos (entradas, salidas, vales, órdenes de compra) se conservarán. ¿Deseas continuar?`}
+          confirmText="Desactivar"
+          loading={loading}
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmOpen(false)}
+        />
       </div>
     </div>
   )

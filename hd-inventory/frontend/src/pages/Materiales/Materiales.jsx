@@ -1,15 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { usePersistentState } from '../../hooks/usePersistentState'
 import api from '../../api/client'
-import { useAuth } from '../../context/AuthContext'
 import './Materiales.css'
 import MaterialModal from './MaterialModal'
 import ReportModal from './ReportModal'
 
 export default function Materiales() {
-  const { user } = useAuth()
-  const isManager = user?.role === 'manager'
-
   const [materiales, setMateriales] = useState([])
   const [loading, setLoading]       = useState(true)
   const [search, setSearch]         = usePersistentState('hd_mat_search', '')
@@ -113,7 +109,7 @@ export default function Materiales() {
             <tbody>
               {materiales.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="materiales-empty">
+                  <td colSpan={9} className="materiales-empty">
                     No se encontraron materiales con los filtros aplicados.
                   </td>
                 </tr>
@@ -150,6 +146,34 @@ export default function Materiales() {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Paginación */}
+      {count > PAGE_SIZE && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-4)' }}>
+          <span className="text-muted text-sm">
+            Mostrando {(page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, count)} de {count} materiales
+          </span>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              disabled={page <= 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+            >
+              &laquo; Anterior
+            </button>
+            <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>
+              Pág. {page} de {Math.ceil(count / PAGE_SIZE)}
+            </span>
+            <button
+              className="btn btn-secondary btn-sm"
+              disabled={page >= Math.ceil(count / PAGE_SIZE)}
+              onClick={() => setPage(p => p + 1)}
+            >
+              Siguiente &raquo;
+            </button>
+          </div>
         </div>
       )}
       

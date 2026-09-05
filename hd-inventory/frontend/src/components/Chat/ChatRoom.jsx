@@ -3,6 +3,7 @@ import { useWebSocket } from '../../hooks/useWebSocket'
 import api from '../../api/client'
 import ChatMessage from './ChatMessage'
 import ChatInput from './ChatInput'
+import ConfirmModal from '../ConfirmModal'
 import { BackIcon, SearchIcon, CloseIcon } from './ChatIcons'
 
 export default function ChatRoom({ conversation, onBack, currentUser }) {
@@ -11,6 +12,7 @@ export default function ChatRoom({ conversation, onBack, currentUser }) {
   const [typingUser, setTypingUser] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [showSearch, setShowSearch] = useState(false)
+  const [confirmMsg, setConfirmMsg] = useState(null)
   const scrollRef = useRef(null)
 
   // WebSocket
@@ -122,11 +124,12 @@ export default function ChatRoom({ conversation, onBack, currentUser }) {
 
   const handleDeleteMessage = async (msg) => {
     if (msg.pending) return // No eliminar mensajes temporales
-    if (!window.confirm('¿Eliminar este mensaje?')) return
     try {
       await api.delete(`/chat/messages/${msg.id}/`)
+      setConfirmMsg(null)
     } catch (err) {
       console.error('Error deleting message', err)
+      setConfirmMsg(null)
     }
   }
 
@@ -183,7 +186,7 @@ export default function ChatRoom({ conversation, onBack, currentUser }) {
                 message={msg} 
                 isOwn={msg.sender_id === currentUser?.id || msg.sender === currentUser?.id}
                 onPin={handlePinMessage}
-                onAction={(type, m) => type === 'delete' ? handleDeleteMessage(m) : null}
+                onAction={(type, m) => type === 'delete' ? setConfirmMsg(m) : null}
               />
             ))}
             {typingUser && (
@@ -199,6 +202,15 @@ export default function ChatRoom({ conversation, onBack, currentUser }) {
         onSendMessage={handleSendMessage} 
         onSendFile={handleSendFile}
         onTyping={sendTyping} 
+      />
+
+      <ConfirmModal
+        open={!!confirmMsg}
+        title="¿Eliminar mensaje?"
+        message="Este mensaje se eliminará de forma permanente para todos los participantes."
+        confirmText="Eliminar"
+        onConfirm={() => handleDeleteMessage(confirmMsg)}
+        onCancel={() => setConfirmMsg(null)}
       />
     </div>
   )

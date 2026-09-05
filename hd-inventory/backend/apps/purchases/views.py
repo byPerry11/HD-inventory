@@ -9,6 +9,7 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from apps.accounts.permissions import IsSupervisorOrAbove, IsSupervisorOrAboveOrReadOnly
 from .models import OrdenCompra, Proveedor
 from .serializers import OrdenCompraSerializer, OrdenCompraListSerializer, ProveedorSerializer
+from .filters import OrdenCompraFilter
 
 
 class ProveedorViewSet(viewsets.ModelViewSet):
@@ -21,6 +22,25 @@ class ProveedorViewSet(viewsets.ModelViewSet):
     ordering_fields = ['nombre', 'creado_en']
     ordering = ['nombre']
 
+    def create(self, request, *args, **kwargs):
+        """
+        Si ya existe un proveedor con el mismo nombre (case-insensitive),
+        se mantiene el más antiguo y se actualizan solo sus datos de contacto.
+        Evita duplicados por variaciones de mayúsculas/minúsculas.
+        """
+        data = request.data.copy()
+        nombre = (data.get('nombre') or '').strip()
+        if nombre:
+            existente = Proveedor.objects.filter(nombre__iexact=nombre).order_by('id').first()
+            if existente:
+                for field in ('contacto', 'telefono', 'email', 'direccion'):
+                    if data.get(field):
+                        setattr(existente, field, data.get(field))
+                existente.save()
+                serializer = self.get_serializer(existente)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+        return super().create(request, *args, **kwargs)
+
 
 class OrdenCompraViewSet(viewsets.ModelViewSet):
     """
@@ -29,14 +49,14 @@ class OrdenCompraViewSet(viewsets.ModelViewSet):
     """
     permission_classes = [IsSupervisorOrAboveOrReadOnly]
     queryset           = OrdenCompra.objects.select_related('material', 'creado_por', 'actualizado_por', 'proveedor_ref')
+    filterset_class    = OrdenCompraFilter
     filter_backends    = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields   = ['status', 'moneda', 'vendedor', 'proveedor_ref', 'es_remision']
     search_fields      = ['no_parte', 'descripcion', 'po_number', 'vendedor', 'no_pr']
     ordering_fields    = ['fecha_emision', 'status', 'costo_unitario', 'actualizado_en']
     ordering           = ['-fecha_emision']
 
     def get_permissions(self):
-        if self.action == 'destroy':
+        if self.action in ('destroy', 'cancel_order'):
             return [IsAuthenticated()]
         return super().get_permissions()
 
@@ -53,23 +73,14 @@ class OrdenCompraViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         """
-        Eliminación lógica: cancela la orden si está en estado cancelable.
+        Eliminación definitiva de la orden.
         Cualquier usuario autenticado puede ejecutar esta acción.
+        Las referencias (material, proveedor_ref) usan SET_NULL, por lo que
+        la cascada no rompe el inventario ni el catálogo de proveedores.
         """
         instance = self.get_object()
-
-        if instance.status not in OrdenCompra.ESTADOS_CANCELABLE:
-            return Response(
-                {"error": f"No se puede eliminar una orden en estado {instance.get_status_display()}."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        instance.status = 'cancelado'
-        instance.actualizado_por = request.user
-        instance.save()
-
-        serializer = self.get_serializer(instance)
-        return Response(serializer.data)
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def update(self, request, *args, **kwargs):
         """

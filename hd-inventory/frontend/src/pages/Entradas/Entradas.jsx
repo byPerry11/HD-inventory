@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { usePersistentState } from '../../hooks/usePersistentState'
 import api from '../../api/client'
-import { useAuth } from '../../context/AuthContext'
+import { useToast } from '../../context/ToastContext'
 
 const EMPTY_FORM = {
   material: '',
@@ -23,7 +23,7 @@ const EMPTY_NEW_MATERIAL = {
 }
 
 export default function Entradas() {
-  const { user } = useAuth()
+  const notify = useToast()
 
   const [form, setForm]           = usePersistentState('hd_entr_form', EMPTY_FORM)
   const [searchResults, setSearchResults] = useState([])
@@ -77,10 +77,13 @@ export default function Entradas() {
     try {
       await api.post('/inventory/entradas/', form)
       setSuccess(true)
+      notify.success('Entrada registrada. Stock actualizado.')
       setForm(EMPTY_FORM); setSelected(null); setSearch('')
       setTimeout(() => setSuccess(false), 4000)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al registrar la entrada.')
+      const msg = err.response?.data?.detail || 'Error al registrar la entrada.'
+      setError(msg)
+      notify.error(msg)
     } finally { setLoading(false) }
   }
 
@@ -89,7 +92,10 @@ export default function Entradas() {
       <div className="page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h1 className="page-title">Entrada de Materiales</h1>
+            <h1 className="page-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Entrada de Materiales
+            </h1>
             <p className="page-subtitle">Registra el ingreso de material al almacén</p>
           </div>
           <button className="btn btn-primary" onClick={() => setShowNewMaterial(true)}>
@@ -244,12 +250,13 @@ export default function Entradas() {
                   stock_minimo: parseInt(newMatForm.stock_minimo) || 10,
                   stock_critico: parseInt(newMatForm.stock_critico) || 5,
                 })
+                notify.success(`Material "${newMatForm.name}" creado correctamente.`)
                 setShowNewMaterial(false)
                 setNewMatForm(EMPTY_NEW_MATERIAL)
               } catch (err) {
                 const detail = err.response?.data
                 const msg = typeof detail === 'object' ? Object.entries(detail).map(([k,v]) => `${k}: ${v}`).join(', ') : (detail || 'Error al crear el material')
-                alert(msg)
+                notify.error(msg)
               } finally { setNewMatLoading(false) }
             }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>

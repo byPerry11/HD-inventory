@@ -418,11 +418,11 @@ export default function Dashboard() {
 
       {/* ─── Modal Vista Rápida Vale ────────────────────────── */}
       {selectedVale && selectedVale.tipo === 'vale' && (
-        <div className="quick-view-overlay" onClick={() => setSelectedVale(null)}>
-          <div className="quick-view-modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-backdrop" onClick={() => setSelectedVale(null)}>
+          <div className="modal-content" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3 style={{ margin: 0 }}>Detalle de Vale</h3>
-              <button className="btn-close" onClick={() => setSelectedVale(null)}>✕</button>
+              <button className="modal-close" onClick={() => setSelectedVale(null)}>×</button>
             </div>
             <div className="modal-body">
               <div style={{ textAlign: 'center', marginBottom: 'var(--space-4)' }}>

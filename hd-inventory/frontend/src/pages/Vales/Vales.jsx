@@ -4,6 +4,7 @@ import { printVale } from '../../utils/printUtils'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import ValeModal from './ValeModal'
+import ConfirmModal from '../../components/ConfirmModal'
 import './Vales.css'
 
 const PAGE_SIZES = [25, 50, 100]
@@ -36,6 +37,8 @@ export default function Vales() {
   const [editId, setEditId] = useState(null)
   const [editForm, setEditForm] = useState({})
   const [showValeModal, setShowValeModal] = useState(false)
+  const [deleteState, setDeleteState] = useState(null)   // { vale, returnStock }
+  const [deleting, setDeleting] = useState(false)
 
   const buildParams = useCallback(() => {
     const params = new URLSearchParams()
@@ -120,16 +123,16 @@ export default function Vales() {
   }
 
   const handleDelete = async (vale) => {
-    const msg = `¿Eliminar Vale #${vale.recibo_no || vale.id}?\n\n¿Devolver materiales al inventario?`
-    const opcion = window.confirm(msg)
-    if (opcion === null) return
-    const returnStock = opcion
+    setDeleting(true)
     try {
-      await api.delete(`/inventory/vales/${vale.id}/?return_stock=${returnStock}`)
-      notify.success(returnStock ? 'Vale eliminado y materiales devueltos al stock' : 'Vale eliminado')
+      await api.delete(`/inventory/vales/${vale.id}/?return_stock=${deleteState.returnStock}`)
+      notify.success(deleteState.returnStock ? 'Vale eliminado y materiales devueltos al stock' : 'Vale eliminado')
+      setDeleteState(null)
       fetchVales()
     } catch {
       notify.error('Error al eliminar el vale')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -235,7 +238,7 @@ export default function Vales() {
                         {canEdit && (
                           <>
                             <button className="btn btn-sm btn-secondary" onClick={() => handleEditClick(v)}>Editar</button>
-                            <button className="btn btn-sm btn-danger" onClick={() => handleDelete(v)}>Eliminar</button>
+                            <button className="btn btn-sm btn-danger" onClick={() => setDeleteState({ vale: v, returnStock: true })}>Eliminar</button>
                           </>
                         )}
                       </div>
@@ -483,6 +486,25 @@ export default function Vales() {
       )}
 
       <ValeModal open={showValeModal} onClose={created => { setShowValeModal(false); if (created) fetchVales() }} />
+
+      <ConfirmModal
+        open={!!deleteState}
+        title={`Eliminar Vale #${deleteState?.vale?.recibo_no || deleteState?.vale?.id || ''}`}
+        message="Se eliminará el vale permanentemente."
+        confirmText="Eliminar"
+        loading={deleting}
+        onConfirm={() => handleDelete(deleteState?.vale)}
+        onCancel={() => setDeleteState(null)}
+      >
+        <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', margin: '0 0 var(--space-4)', justifyContent: 'center', fontSize: '0.9rem', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={deleteState?.returnStock}
+            onChange={e => setDeleteState(s => ({ ...s, returnStock: e.target.checked }))}
+          />
+          Devolver materiales al inventario
+        </label>
+      </ConfirmModal>
     </div>
   )
 }

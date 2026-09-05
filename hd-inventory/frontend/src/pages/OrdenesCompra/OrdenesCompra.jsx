@@ -2,15 +2,38 @@ import { useState, useEffect } from 'react'
 import api from '../../api/client'
 import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
+import ConfirmModal from '../../components/ConfirmModal'
 import './OrdenesCompra.css'
+
+const EMPTY_FILTERS = { search: '', status: '' }
+
+const PAGE_SIZES = [25, 50, 100]
 
 export default function OrdenesCompra() {
   const { user } = useAuth()
   const isCapturista = user?.role === 'capturista'
   const [ordenes, setOrdenes] = useState([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [editValues, setEditValues] = useState({})
+  
+  const [filters, setFilters] = useState(EMPTY_FILTERS)
+  const [sortOrder, setSortOrder] = useState('recent') // 'recent' | 'oldest'
+
+  // Modal de edición individual
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editOrden, setEditOrden] = useState(null)
+  const [editForm, setEditForm] = useState({})
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  // Confirmación de eliminación / cancelación
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [confirmCancelId, setConfirmCancelId] = useState(null)
+  const [cancelling, setCancelling] = useState(false)
   
   const [isCreating, setIsCreating] = useState(false)
   const [newOc, setNewOc] = useState({
@@ -43,7 +66,7 @@ export default function OrdenesCompra() {
   const STATUS_COLORS = {
     'pr_creada':    { bg: 'rgba(255, 255, 255, 0.05)', fg: '#8b949e', label: 'PR Creada' },
     'pr_aprobada':  { bg: 'rgba(210, 153, 34, 0.15)', fg: '#d2991f', label: 'PR Aprobada' },
-    'po_aprobada':  { bg: 'rgba(139, 148, 158, 0.15)', fg: '#8b949e', label: 'PO Aprobada' },
+    'po_aprobada':  { bg: 'rgba(236, 72, 153, 0.15)', fg: '#ec4899', label: 'PO Aprobada' },
     'ordenado':     { bg: 'rgba(31, 111, 235, 0.12)', fg: '#58a6ff', label: 'Ordenado' },
     'recibido':     { bg: 'rgba(46, 160, 67, 0.15)',  fg: '#3fb950', label: 'Recibido' },
     'pedido_rem':   { bg: 'rgba(163, 113, 247, 0.15)', fg: '#a371f7', label: 'Pedido REM' },
@@ -57,18 +80,39 @@ export default function OrdenesCompra() {
   useEffect(() => {
     fetchOrdenes()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [page, pageSize, sortOrder])
 
   const fetchOrdenes = async () => {
+    setLoading(true)
     try {
-      const { data } = await api.get('/purchases/ordenes/')
+      const params = new URLSearchParams()
+      params.set('page', page)
+      params.set('page_size', pageSize)
+      params.set('ordering', sortOrder === 'oldest' ? 'fecha_emision' : '-fecha_emision')
+      Object.entries(filters).forEach(([k, v]) => {
+        if (v) params.set(k, v)
+      })
+      const qs = params.toString()
+      const { data } = await api.get(`/purchases/ordenes/${qs ? `?${qs}` : ''}`)
       setOrdenes(data.results || data)
+      setTotalCount(data.count || 0)
       setLoading(false)
     } catch (err) {
       notify.error('Error al cargar las órdenes')
       setLoading(false)
     }
   }
+
+  const applyFilters = () => {
+    setPage(1)
+    fetchOrdenes()
+  }
+
+  const handleFilterChange = (key, value) => {
+    setFilters(f => ({ ...f, [key]: value }))
+  }
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
 
   const toggleEditMode = () => {
     if (isEditing) {
@@ -159,17 +203,80 @@ export default function OrdenesCompra() {
     }
   }
 
-  const handleDeleteOrder = async (id) => {
-    const ok = window.confirm(
-      '¿Eliminar orden de compra?\n\nEsta acción cancelará la orden y no se puede deshacer. Los registros de entrada/salida asociados no se verán afectados. ¿Deseas continuar?'
-    )
-    if (!ok) return
+  const handleDeleteOrder = async () => {
+    setDeleting(true)
     try {
-      await api.delete(`/purchases/ordenes/${id}/`)
-      notify.success('Orden cancelada')
+      await api.delete(`/purchases/ordenes/${confirmDeleteId}/`)
+      notify.success('Orden eliminada')
+      setConfirmDeleteId(null)
       fetchOrdenes()
     } catch (err) {
       notify.error(err.response?.data?.error || 'No se pudo eliminar la orden')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const handleCancelOrder = async () => {
+    setCancelling(true)
+    try {
+      await api.post(`/purchases/ordenes/${confirmCancelId}/cancel/`)
+      notify.success('Orden cancelada')
+      setConfirmCancelId(null)
+      fetchOrdenes()
+    } catch (err) {
+      notify.error(err.response?.data?.error || 'No se pudo cancelar la orden')
+    } finally {
+      setCancelling(false)
+    }
+  }
+
+  const openEditModal = (orden) => {
+    setEditOrden(orden)
+    setEditForm({
+      status: orden.status || '',
+      no_parte: orden.no_parte || '',
+      descripcion: orden.descripcion || '',
+      cantidad: orden.cantidad || 1,
+      costo_unitario: orden.costo_unitario || 0,
+      moneda: orden.moneda || 'MXN',
+      vendedor: orden.vendedor || '',
+      no_pr: orden.no_pr || '',
+      po_number: orden.po_number || '',
+      comentarios: orden.comentarios || '',
+      es_remision: orden.es_remision || false,
+      fecha_pr: orden.fecha_pr ? new Date(orden.fecha_pr).toISOString().slice(0, 16) : '',
+      fecha_pr_aprobada: orden.fecha_pr_aprobada ? new Date(orden.fecha_pr_aprobada).toISOString().slice(0, 16) : '',
+      fecha_po_aprobada: orden.fecha_po_aprobada ? new Date(orden.fecha_po_aprobada).toISOString().slice(0, 16) : '',
+      fecha_ordenado: orden.fecha_ordenado ? new Date(orden.fecha_ordenado).toISOString().slice(0, 16) : '',
+      fecha_recibido: orden.fecha_recibido ? new Date(orden.fecha_recibido).toISOString().slice(0, 16) : '',
+    })
+    setShowEditModal(true)
+  }
+
+  const closeEditModal = () => {
+    setShowEditModal(false)
+    setEditOrden(null)
+    setEditForm({})
+  }
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault()
+    if (!editOrden) return
+    setSavingEdit(true)
+    try {
+      const payload = { ...editForm }
+      // Convertir fechas vacías a null (los campos son nullable en backend)
+      ;['fecha_pr', 'fecha_pr_aprobada', 'fecha_po_aprobada', 'fecha_ordenado', 'fecha_recibido']
+        .forEach(k => { if (payload[k] === '') payload[k] = null })
+      await api.patch(`/purchases/ordenes/${editOrden.id}/`, payload)
+      notify.success('Orden actualizada')
+      closeEditModal()
+      fetchOrdenes()
+    } catch (err) {
+      notify.error(err.response?.data?.error || 'Error al actualizar la orden')
+    } finally {
+      setSavingEdit(false)
     }
   }
 
@@ -209,7 +316,9 @@ export default function OrdenesCompra() {
       const { data } = await api.get(`/materials/?search=${val}`)
       setSuggestions((data.results || data).slice(0, 5))
       setShowSuggestions(true)
-    } catch (err) {}
+    } catch {
+      // Ignorar errores de búsqueda predictiva
+    }
   }
 
   const selectSuggestion = async (mat) => {
@@ -228,7 +337,9 @@ export default function OrdenesCompra() {
         }))
         notify.info('Historial recuperado')
       }
-    } catch (err) {}
+    } catch {
+      // Ignorar error al buscar historial previo
+    }
   }
 
   const formatMoney = (amount, currency) => {
@@ -274,6 +385,61 @@ export default function OrdenesCompra() {
         </div>
       </div>
 
+      {/* Filtros — disparan búsqueda con el botón Buscar o Enter */}
+      <div className="card mb-6 p-4">
+        <div className="historial-filters">
+          <div className="filter-group" style={{ flex: 1, minWidth: '240px' }}>
+            <label className="filter-label">Buscar (No. Parte, No. PR o Descripción)</label>
+            <div className="search-with-btn">
+              <input
+                type="text"
+                className="form-control"
+                placeholder="S-14938NAT, PR-000 o descripción..."
+                value={filters.search}
+                onChange={e => handleFilterChange('search', e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') applyFilters() }}
+                style={{ width: '100%' }}
+              />
+              <button className="btn btn-primary" onClick={applyFilters} style={{ height: '30px', whiteSpace: 'nowrap' }}>
+                Buscar
+              </button>
+            </div>
+          </div>
+          <div className="filter-group">
+            <label className="filter-label">Status</label>
+            <select
+              className="form-control"
+              value={filters.status}
+              onChange={e => { handleFilterChange('status', e.target.value); applyFilters() }}
+            >
+              <option value="">Todos</option>
+              {Object.entries(STATUS_COLORS).map(([key, s]) => (
+                <option key={key} value={key}>{s.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="filter-group">
+            <label className="filter-label">Ordenar por</label>
+            <div className="sort-toggle">
+              <button
+                type="button"
+                className={`btn btn-sm ${sortOrder === 'recent' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => { setPage(1); setSortOrder('recent') }}
+              >
+                Más reciente
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${sortOrder === 'oldest' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => { setPage(1); setSortOrder('oldest') }}
+              >
+                Más antiguo
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="table-container">
         {loading ? (
           <div className="loading-container">
@@ -301,6 +467,7 @@ export default function OrdenesCompra() {
             <tbody>
               {ordenes.map(orden => {
                 const isCerrada = orden.status === 'recibido' || orden.status === 'rem_recibido' || orden.status === 'cancelado'
+                const esCancelable = ['pr_creada', 'pr_aprobada', 'po_aprobada', 'pedido_rem'].includes(orden.status)
                 const isItemEditing = isEditing && editValues[orden.id] && !isCerrada
                 const val = isItemEditing ? editValues[orden.id] : orden
                 const nextStep = getNextStatus(orden)
@@ -426,15 +593,31 @@ export default function OrdenesCompra() {
 
                     <td>
                       <div className="row-actions">
-                        {!isCerrada && (
+                        {orden.status !== 'cancelado' && (
                           <button 
-                            className="btn-icon text-urge" 
-                            title="Cancelar/Eliminar Orden"
-                            onClick={() => handleDeleteOrder(orden.id)}
+                            className="btn-icon" 
+                            title="Editar Orden"
+                            onClick={() => openEditModal(orden)}
                           >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                           </button>
                         )}
+                        {esCancelable && (
+                          <button 
+                            className="btn-icon" 
+                            title="Cancelar Orden (status → Cancelado)"
+                            onClick={() => setConfirmCancelId(orden.id)}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                          </button>
+                        )}
+                        <button 
+                          className="btn-icon text-urge" 
+                          title="Eliminar Orden (eliminación definitiva)"
+                          onClick={() => setConfirmDeleteId(orden.id)}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                        </button>
                         {orden.comentarios && (
                           <div className="comment-indicator" title={orden.comentarios}>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
@@ -449,6 +632,41 @@ export default function OrdenesCompra() {
           </table>
         )}
       </div>
+
+      {/* Paginación */}
+      {totalCount > 0 && (
+        <div className="historial-pagination">
+          <span className="pagination-info">
+            Mostrando {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, totalCount)} de {totalCount} órdenes
+          </span>
+          <div className="pagination-controls">
+            <select
+              className="form-control pagination-page-size"
+              value={pageSize}
+              onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}
+            >
+              {PAGE_SIZES.map(ps => (
+                <option key={ps} value={ps}>{ps} por página</option>
+              ))}
+            </select>
+            <button
+              className="btn btn-secondary"
+              disabled={page <= 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+            >
+              &laquo; Anterior
+            </button>
+            <span className="pagination-page">Pág. {page} de {totalPages}</span>
+            <button
+              className="btn btn-secondary"
+              disabled={page >= totalPages}
+              onClick={() => setPage(p => p + 1)}
+            >
+              Siguiente &raquo;
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal: Nueva Orden */}
       {isCreating && (
@@ -767,6 +985,208 @@ export default function OrdenesCompra() {
         </div>
         )
       })()}
+
+      {/* Modal: Editar Orden */}
+      {showEditModal && editOrden && (
+        <div className="modal-overlay" onClick={closeEditModal}>
+          <div className="modal-content modal-content--create" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">Editar Orden #{editOrden.id}</h2>
+              <button className="btn-close" onClick={closeEditModal}>&times;</button>
+            </div>
+            <form className="modal-form modal-form--scrollable" onSubmit={handleSaveEdit}>
+              <div className="form-row">
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>No. Parte</label>
+                  <input
+                    type="text" className="input-text" required
+                    value={editForm.no_parte || ''}
+                    onChange={e => setEditForm(f => ({ ...f, no_parte: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>Cantidad</label>
+                  <input
+                    type="number" className="input-text" min="1" required
+                    value={editForm.cantidad ?? 1}
+                    onChange={e => setEditForm(f => ({ ...f, cantidad: parseInt(e.target.value) || 1 }))}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Descripción</label>
+                <input
+                  type="text" className="input-text" required
+                  value={editForm.descripcion || ''}
+                  onChange={e => setEditForm(f => ({ ...f, descripcion: e.target.value }))}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Status</label>
+                <select
+                  className="input-select"
+                  value={editForm.status || ''}
+                  onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}
+                >
+                  {Object.entries(STATUS_COLORS).map(([key, s]) => (
+                    <option key={key} value={key}>{s.label}</option>
+                  ))}
+                </select>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                  Cambiar a Recibido / REM Recibido ajustará el stock del material automáticamente.
+                </span>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>Costo Unitario</label>
+                  <input
+                    type="number" className="input-text" min="0" step="0.0001" required
+                    value={editForm.costo_unitario ?? 0}
+                    onChange={e => setEditForm(f => ({ ...f, costo_unitario: parseFloat(e.target.value) || 0 }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Moneda</label>
+                  <select
+                    className="input-select"
+                    value={editForm.moneda || 'MXN'}
+                    onChange={e => setEditForm(f => ({ ...f, moneda: e.target.value }))}
+                    style={{ width: '100px' }}
+                  >
+                    <option value="MXN">MXN</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>Proveedor</label>
+                  <input
+                    type="text" className="input-text"
+                    value={editForm.vendedor || ''}
+                    onChange={e => setEditForm(f => ({ ...f, vendedor: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>No. PR</label>
+                  <input
+                    type="text" className="input-text"
+                    placeholder="PR-000"
+                    value={editForm.no_pr || ''}
+                    onChange={e => setEditForm(f => ({ ...f, no_pr: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>No. PO</label>
+                <input
+                  type="text" className="input-text"
+                  placeholder="PO-XXXX"
+                  value={editForm.po_number || ''}
+                  onChange={e => setEditForm(f => ({ ...f, po_number: e.target.value }))}
+                />
+              </div>
+
+              <div className="form-section-divider">
+                <span>Fechas de Actualización de Status</span>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>{editForm.es_remision ? 'Pedido REM' : 'PR Creada'}</label>
+                  <input
+                    type="datetime-local" className="input-text"
+                    value={editForm.fecha_pr || ''}
+                    onChange={e => setEditForm(f => ({ ...f, fecha_pr: e.target.value }))}
+                  />
+                </div>
+                {!editForm.es_remision && (
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label>PR Aprobada</label>
+                    <input
+                      type="datetime-local" className="input-text"
+                      value={editForm.fecha_pr_aprobada || ''}
+                      onChange={e => setEditForm(f => ({ ...f, fecha_pr_aprobada: e.target.value }))}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {!editForm.es_remision && (
+                <div className="form-row">
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label>PO Aprobada</label>
+                    <input
+                      type="datetime-local" className="input-text"
+                      value={editForm.fecha_po_aprobada || ''}
+                      onChange={e => setEditForm(f => ({ ...f, fecha_po_aprobada: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label>Ordenado</label>
+                    <input
+                      type="datetime-local" className="input-text"
+                      value={editForm.fecha_ordenado || ''}
+                      onChange={e => setEditForm(f => ({ ...f, fecha_ordenado: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="form-group">
+                <label>{editForm.es_remision ? 'REM Recibido' : 'Recibido'}</label>
+                <input
+                  type="datetime-local" className="input-text"
+                  value={editForm.fecha_recibido || ''}
+                  onChange={e => setEditForm(f => ({ ...f, fecha_recibido: e.target.value }))}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Comentarios</label>
+                <textarea
+                  className="input-text" rows={2}
+                  value={editForm.comentarios || ''}
+                  onChange={e => setEditForm(f => ({ ...f, comentarios: e.target.value }))}
+                />
+              </div>
+
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={closeEditModal}>Cancelar</button>
+                <button type="submit" className="btn btn-primary" disabled={savingEdit}>
+                  {savingEdit ? 'Guardando...' : 'Guardar Cambios'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <ConfirmModal
+        open={!!confirmCancelId}
+        title="¿Cancelar orden de compra?"
+        message="La orden cambiará a estado Cancelado. Los registros de entrada/salida asociados no se verán afectados. ¿Deseas continuar?"
+        confirmText="Cancelar Orden"
+        danger={false}
+        loading={cancelling}
+        onConfirm={handleCancelOrder}
+        onCancel={() => setConfirmCancelId(null)}
+      />
+
+      <ConfirmModal
+        open={!!confirmDeleteId}
+        title="¿Eliminar orden de compra?"
+        message="Esta acción eliminará la orden de forma definitiva y no se puede deshacer. ¿Deseas continuar?"
+        confirmText="Eliminar"
+        loading={deleting}
+        onConfirm={handleDeleteOrder}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   )
 }

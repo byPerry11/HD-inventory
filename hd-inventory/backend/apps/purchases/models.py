@@ -13,13 +13,14 @@ Al cambiar a 'recibido':
     pueda incluir una advertencia en la respuesta.
 """
 from django.db import models
+from django.db.models.functions import Lower
 from django.conf import settings
 from django.utils import timezone
 
 
 class Proveedor(models.Model):
     """Modelo para gestionar proveedores del almacén."""
-    nombre = models.CharField(max_length=200, unique=True, verbose_name='Nombre')
+    nombre = models.CharField(max_length=200, verbose_name='Nombre')
     contacto = models.CharField(max_length=200, blank=True, verbose_name='Persona de Contacto')
     telefono = models.CharField(max_length=50, blank=True, verbose_name='Teléfono')
     email = models.EmailField(blank=True, verbose_name='Email')
@@ -31,9 +32,38 @@ class Proveedor(models.Model):
         verbose_name = 'Proveedor'
         verbose_name_plural = 'Proveedores'
         ordering = ['nombre']
+        constraints = [
+            models.UniqueConstraint(
+                Lower('nombre'),
+                name='proveedor_nombre_ci_unique',
+            ),
+        ]
 
     def __str__(self):
         return self.nombre
+
+    @classmethod
+    def get_or_create_canonical(cls, nombre):
+        """
+        Devuelve el proveedor canónico (el más antiguo) cuyo nombre coincida
+        ignorando mayúsculas/minúsculas. Si no existe, lo crea.
+
+        Así se garantiza que un mismo proveedor nunca se duplique por variar
+        la capitalización del nombre.
+        """
+        nombre = (nombre or '').strip()
+        if not nombre:
+            return None
+        existente = cls.objects.filter(nombre__iexact=nombre).order_by('id').first()
+        if existente:
+            return existente
+        return cls.objects.create(nombre=nombre)
+
+    def save(self, *args, **kwargs):
+        self.nombre = (self.nombre or '').strip()
+        if not self.nombre:
+            raise ValueError('El nombre del proveedor no puede estar vacío.')
+        super().save(*args, **kwargs)
 
 
 class OrdenCompra(models.Model):
@@ -216,16 +246,12 @@ class OrdenCompra(models.Model):
         return None
 
     def save(self, *args, **kwargs):
-        # Limpieza de fechas y campos según el estado actual para evitar inconsistencias
-        if self.status not in ('recibido', 'rem_recibido'):
-            self.fecha_recibido = None
-            self.recibido_por = ''
-        if self.status not in ('ordenado', 'recibido', 'rem_recibido'):
-            self.fecha_ordenado = None
-        if self.status not in ('po_aprobada', 'ordenado', 'recibido', 'rem_recibido'):
-            self.fecha_po_aprobada = None
-        if self.status not in ('pr_aprobada', 'po_aprobada', 'ordenado', 'recibido', 'rem_recibido'):
-            self.fecha_pr_aprobada = None
+        # Auto-registro de proveedor: si la orden tiene nombre de vendedor,
+        # se persiste/vincula al catálogo de proveedores (case-insensitive).
+        if self.vendedor and self.vendedor.strip():
+            self.proveedor_ref = Proveedor.get_or_create_canonical(self.vendedor)
+        else:
+            self.proveedor_ref = None
 
         now = timezone.now()
         today = now.date()
@@ -236,6 +262,18 @@ class OrdenCompra(models.Model):
         status_changed = is_new or (self.status != old_status)
 
         if status_changed:
+            # Limpieza de fechas y campos según el estado al transicionar,
+            # para evitar inconsistencias (solo al cambiar de status).
+            if self.status not in ('recibido', 'rem_recibido'):
+                self.fecha_recibido = None
+                self.recibido_por = ''
+            if self.status not in ('ordenado', 'recibido', 'rem_recibido'):
+                self.fecha_ordenado = None
+            if self.status not in ('po_aprobada', 'ordenado', 'recibido', 'rem_recibido'):
+                self.fecha_po_aprobada = None
+            if self.status not in ('pr_aprobada', 'po_aprobada', 'ordenado', 'recibido', 'rem_recibido'):
+                self.fecha_pr_aprobada = None
+
             if self.status in ('pr_creada', 'pedido_rem') and not self.fecha_pr:
                 self.fecha_pr = now
             elif self.status == 'pr_aprobada' and not self.fecha_pr_aprobada:
@@ -266,25 +304,21 @@ class OrdenCompra(models.Model):
 
     def _revertir_stock(self):
         """
-        Resta la cantidad al stock del material vinculado y elimina la Entrada de trazabilidad correspondiente.
+        Revierte el stock del material vinculado al sacar una orden del estado
+        recibido/rem_recibido, eliminando la Entrada de trazabilidad asociada.
+
+        La resta del stock la ejecuta el signal post_delete de Entrada
+        (apps/inventory/signals.py), que es la única fuente de verdad para
+        mantener el stock consistente.
         """
         if self.material:
-            from django.db.models import F
-            from django.db import transaction
             from apps.inventory.models import Entrada
 
-            with transaction.atomic():
-                material = self.material
-                material.stock_actual = F('stock_actual') - self.cantidad
-                material.save(update_fields=['stock_actual', 'actualizado_en'])
-                material.refresh_from_db(fields=['stock_actual'])
-
-                # Eliminar la Entrada de trazabilidad asociada
-                Entrada.objects.filter(
-                    material=material,
-                    cantidad=self.cantidad,
-                    numero_orden=self.po_number or f'OC-{self.pk}'
-                ).delete()
+            Entrada.objects.filter(
+                material=self.material,
+                cantidad=self.cantidad,
+                numero_orden=self.po_number or f'OC-{self.pk}'
+            ).delete()
 
     def _actualizar_stock(self) -> bool:
         """

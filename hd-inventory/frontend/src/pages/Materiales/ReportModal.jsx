@@ -1,14 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import api from '../../api/client'
+import { useToast } from '../../context/ToastContext'
 
 // Inline SVG Icons
-const IconX = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-)
-
 const IconCheckSquare = ({ size = 20 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="9 11 12 14 22 4"></polyline>
@@ -31,27 +25,28 @@ const IconDownload = ({ size = 18 }) => (
 )
 
 export default function ReportModal({ onClose }) {
+  const notify = useToast()
   const [categories, setCategories] = useState([])
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [loadingCats, setLoadingCats] = useState(true)
   const [downloading, setDownloading] = useState(false)
 
-  useEffect(() => {
-    fetchCategories()
-  }, [])
-
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       setLoadingCats(true)
       const resp = await api.get('/materials/categorias/')
-      // DRF returns paginated data inside 'results'
       setCategories(resp.data.results || resp.data)
     } catch (err) {
       console.error('Error fetching categories:', err)
+      notify.error('Error al cargar categorías para el reporte.')
     } finally {
       setLoadingCats(false)
     }
-  }
+  }, [notify])
+
+  useEffect(() => {
+    fetchCategories()
+  }, [fetchCategories])
 
   const toggleCategory = (id) => {
     const newSelected = new Set(selectedIds)
@@ -73,7 +68,7 @@ export default function ReportModal({ onClose }) {
 
   const handleDownload = async () => {
     if (selectedIds.size === 0) {
-      alert('Por favor selecciona al menos una categoría.')
+      notify.warning('Por favor selecciona al menos una categoría.')
       return
     }
 
@@ -102,22 +97,22 @@ export default function ReportModal({ onClose }) {
       a.remove()
       window.URL.revokeObjectURL(url)
       
-      // Close modal on success
+      notify.success('Reporte descargado correctamente.')
       onClose()
     } catch (err) {
       console.error('Error descargando reporte', err)
-      alert('Error al generar el reporte. Revisa la consola.')
+      notify.error('Error al generar el reporte de inventario.')
     } finally {
       setDownloading(false)
     }
   }
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal-card" style={{ maxWidth: '500px' }}>
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-content" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>Generar Reporte de Inventario</h3>
-          <button className="btn-icon" onClick={onClose}><IconX size={20} /></button>
+          <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Generar Reporte de Inventario</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
         </div>
         
         <div className="modal-body">
@@ -154,13 +149,13 @@ export default function ReportModal({ onClose }) {
                       gap: '0.75rem', 
                       padding: '0.5rem', 
                       cursor: 'pointer',
-                      borderRadius: 'var(--radius)',
+                      borderRadius: 'var(--radius-md)',
                       background: selectedIds.has(cat.id) ? 'var(--color-bg-hover)' : 'transparent',
                       transition: 'background 0.2s'
                     }}
                     onClick={() => toggleCategory(cat.id)}
                   >
-                    <div style={{ color: selectedIds.has(cat.id) ? 'var(--color-primary)' : 'var(--color-text-muted)', display: 'flex' }}>
+                    <div style={{ color: selectedIds.has(cat.id) ? 'var(--color-accent)' : 'var(--color-text-muted)', display: 'flex' }}>
                       {selectedIds.has(cat.id) ? <IconCheckSquare size={20} /> : <IconSquare size={20} />}
                     </div>
                     <span>{cat.name}</span>
@@ -171,8 +166,8 @@ export default function ReportModal({ onClose }) {
           )}
         </div>
         
-        <div className="modal-footer" style={{ justifyContent: 'flex-end', gap: '1rem' }}>
-          <button className="btn btn-ghost" onClick={onClose} disabled={downloading}>
+        <div className="modal-footer" style={{ justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
+          <button className="btn btn-secondary" onClick={onClose} disabled={downloading}>
             Cancelar
           </button>
           <button 

@@ -3,13 +3,10 @@ import { usePersistentState } from '../../hooks/usePersistentState'
 import client from '../../api/client'
 import { cleanBadgeID } from '../../utils/formatters'
 import { useToast } from '../../context/ToastContext'
-import { useAuth } from '../../context/AuthContext'
 import './Despachar.css'
 import ValeModal from '../Vales/ValeModal'
 export default function Despachar() {
   const notify = useToast()
-  const { user } = useAuth()
-  const isPrivileged = user?.role === 'manager' || user?.role === 'supervisor'
 
   const [searchResults, setSearchResults] = useState([])
   const [categories, setCategories] = useState([])

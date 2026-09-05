@@ -56,8 +56,6 @@ class OrdenCompraSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id', 'costo_total', 'tiempo_entrega_dias',
-            'fecha_pr', 'fecha_pr_aprobada', 'fecha_po_aprobada', 
-            'fecha_ordenado', 'fecha_recibido',
             'creado_en', 'actualizado_en',
             'creado_por', 'actualizado_por',
             'proveedor_nombre',
@@ -83,12 +81,6 @@ class OrdenCompraSerializer(serializers.ModelSerializer):
         if not self.instance:
             es_rem = data.get('es_remision', False)
             data['status'] = 'pedido_rem' if es_rem else 'pr_creada'
-        elif not is_advance:
-            # 2. Al editar manualmente, NO permitir cambiar el status
-            if 'status' in data and data['status'] != self.instance.status:
-                raise serializers.ValidationError({
-                    "status": "El estado no puede cambiarse manualmente. Use los pasos de avance."
-                })
 
         # 3. Validar No. PR requerido SOLO al crear ordenes estándar nuevas
         if not self.instance:

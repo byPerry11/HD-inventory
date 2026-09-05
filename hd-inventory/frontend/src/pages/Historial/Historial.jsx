@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import client from '../../api/client'
 import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
+import ConfirmModal from '../../components/ConfirmModal'
 import './Historial.css'
 
 const PAGE_SIZES = [25, 50, 100]
@@ -28,6 +29,7 @@ export default function Historial() {
   const [selectedItem, setSelectedItem] = useState(null)
   const [editForm, setEditForm] = useState({})
   const [savingId, setSavingId] = useState(null)
+  const [confirmItem, setConfirmItem] = useState(null)
 
   // Contador que incrementa al aplicar filtros o cambiar página
   const [fetchKey, setFetchKey] = useState(0)
@@ -136,13 +138,14 @@ export default function Historial() {
   }
 
   const handleDelete = async (item) => {
-    if (!window.confirm(`¿Eliminar salida #${item.id} de ${item.material_info?.code}?`)) return
     try {
       await client.delete(`/inventory/${activeTab}/${item.id}/`)
       notify.success('Registro eliminado')
+      setConfirmItem(null)
       setFetchKey(k => k + 1)
     } catch (err) {
       notify.error(err.response?.data?.detail || 'Error al eliminar')
+      setConfirmItem(null)
     }
   }
 
@@ -314,7 +317,7 @@ export default function Historial() {
                         </button>
                       )}
                       {(user?.role === 'manager' || user?.role === 'supervisor') && (
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(item)}>
+                        <button className="btn btn-danger btn-sm" onClick={() => setConfirmItem(item)}>
                           Eliminar
                         </button>
                       )}
@@ -477,6 +480,15 @@ export default function Historial() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={!!confirmItem}
+        title={`¿Eliminar ${activeTab === 'salidas' ? 'salida' : 'entrada'} #${confirmItem?.id}?`}
+        message={`Se eliminará ${activeTab === 'salidas' ? 'la salida' : 'la entrada'} de ${confirmItem?.material_info?.code || 'este material'}. Esta acción no se puede deshacer.`}
+        confirmText="Eliminar"
+        onConfirm={() => handleDelete(confirmItem)}
+        onCancel={() => setConfirmItem(null)}
+      />
     </div>
   )
 }

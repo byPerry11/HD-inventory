@@ -1,4 +1,3 @@
-import React from 'react'
 import { FileIcon } from './ChatIcons'
 
 export default function ChatConversationList({ conversations, activeId, onSelect, onNewChat, isLoading }) {

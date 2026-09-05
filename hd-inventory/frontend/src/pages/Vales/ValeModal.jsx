@@ -12,12 +12,13 @@ const FIRMAS = [
   { key: 'firma_entrega', label: 'Quien Entrega', nameKey: 'firma_entrega_nombre' },
 ]
 
+const EMPTY_FORM = {
+  empleado_no: '', empleado_nombre: '', linea: '', area: '', observaciones: '',
+}
+
 export default function ValeModal({ open, onClose, preselectedMaterial }) {
   const notify = useToast()
-  const EMPTY = {
-    empleado_no: '', empleado_nombre: '', linea: '', area: '', observaciones: '',
-  }
-  const [form, setForm] = useState(EMPTY)
+  const [form, setForm] = useState(EMPTY_FORM)
   const [items, setItems] = useState([{ ...EMPTY_ITEM }])
   const [choices, setChoices] = useState({ lineas: [], areas: [], turnos: [] })
   const [filteredAreas, setFilteredAreas] = useState([])
@@ -28,7 +29,7 @@ export default function ValeModal({ open, onClose, preselectedMaterial }) {
 
   useEffect(() => {
     if (open) {
-      setForm(EMPTY)
+      setForm(EMPTY_FORM)
       setItems([{ ...EMPTY_ITEM }])
       setSignatures({})
       setSearchResults({})

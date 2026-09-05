@@ -1,35 +1,38 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import api from '../../api/client'
 import { useToast } from '../../context/ToastContext'
 
 export default function Categorias() {
   const [categorias, setCategorias] = useState([])
   const [loading, setLoading] = useState(true)
-  const { showToast } = useToast()
+  const notify = useToast()
 
-  useEffect(() => {
-    fetchCategorias()
-  }, [])
-
-  const fetchCategorias = async () => {
+  const fetchCategorias = useCallback(async () => {
     try {
       const { data } = await api.get('/materials/categorias/')
       setCategorias(data.results || data)
-    } catch (err) {
-      showToast('Error al cargar categorías', 'error')
+    } catch {
+      notify.error('Error al cargar categorías')
     } finally {
       setLoading(false)
     }
-  }
+  }, [notify])
+
+  useEffect(() => {
+    fetchCategorias()
+  }, [fetchCategorias])
 
   return (
     <div className="categorias-page">
       <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1 className="page-title">Categorías</h1>
+          <h1 className="page-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            Categorías
+          </h1>
           <p className="page-subtitle">Organización de materiales por familias</p>
         </div>
-        <button className="btn btn-primary" onClick={() => showToast('Módulo de creación próximamente', 'info')}>
+        <button className="btn btn-primary" onClick={() => notify.info('Módulo de creación próximamente')}>
           + Nueva Categoría
         </button>
       </header>
