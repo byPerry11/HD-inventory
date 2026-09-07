@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { usePersistentState } from '../../hooks/usePersistentState'
 import api from '../../api/client'
 import { useToast } from '../../context/ToastContext'
+import { Icon, SearchField } from '../../components/ui'
 
 const EMPTY_FORM = {
   material: '',
@@ -90,35 +91,34 @@ export default function Entradas() {
   return (
     <div>
       <div className="page-header">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <h1 className="page-title">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Entrada de Materiales
-            </h1>
-            <p className="page-subtitle">Registra el ingreso de material al almacén</p>
-          </div>
+        <div className="page-header-text">
+          <h1 className="page-title">
+            <Icon name="download" size={20} />
+            Entrada de Materiales
+          </h1>
+          <p className="page-subtitle">Registra el ingreso de material al almacén</p>
+        </div>
+        <div className="page-actions">
           <button className="btn btn-primary" onClick={() => setShowNewMaterial(true)}>
-            + Nuevo Material
+            <Icon name="plus" size={15} /> Nuevo material
           </button>
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 24, alignItems: 'start' }}>
         <form className="card" style={{ display: 'flex', flexDirection: 'column', gap: 20 }} onSubmit={handleSubmit}>
-          {success && <div className="alert alert-success"><span>✓</span><span>Entrada registrada. Stock actualizado.</span></div>}
-          {error   && <div className="alert alert-error"><span>⚠</span><span>{error}</span></div>}
+          {success && <div className="alert alert-success"><Icon name="checkCircle" size={16} /><span>Entrada registrada. Stock actualizado.</span></div>}
+          {error   && <div className="alert alert-error"><Icon name="alert" size={16} /><span>{error}</span></div>}
 
           {/* Material */}
           <div className="form-group">
             <label className="form-label">Parte / Material *</label>
             <div style={{ position: 'relative' }}>
-              <input
-                className="form-control"
-                type="text"
-                placeholder="Buscar por código o nombre..."
+              <SearchField
                 value={search}
-                onChange={e => { const v = e.target.value; setSearch(v); setSelected(null); setForm(f => ({...f, material:''})); doSearch(v) }}
+                placeholder="Buscar por código o nombre..."
+                aria-label="Buscar material"
+                onChange={(v) => { setSearch(v); setSelected(null); setForm(f => ({...f, material:''})); doSearch(v) }}
               />
               {!selected && searchResults.length > 0 && (
                 <ul style={{
@@ -198,7 +198,7 @@ export default function Entradas() {
             <button type="submit" className="btn btn-success" disabled={loading || !form.material}>
               {loading
                 ? <><div className="spinner" style={{width:16,height:16}} /> Registrando...</>
-                : '📥 Registrar Entrada'
+                : <><Icon name="inbox" size={15} /> Registrar entrada</>
               }
             </button>
           </div>
@@ -206,7 +206,7 @@ export default function Entradas() {
 
         {/* Tips */}
         <div className="card" style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          <h3 style={{ fontSize:'var(--font-size-base)', fontWeight:600 }}>ℹ️ Instrucciones</h3>
+          <h3 style={{ fontSize:'var(--font-size-base)', fontWeight:600, display:'flex', alignItems:'center', gap:8 }}><Icon name="info" size={16} /> Instrucciones</h3>
           <ul style={{ listStyle:'none', display:'flex', flexDirection:'column', gap:12 }}>
             {[
               'Busca el material por código o nombre',
@@ -215,7 +215,7 @@ export default function Entradas() {
               'El stock se actualiza automáticamente al guardar',
             ].map((tip, i) => (
               <li key={i} style={{ fontSize:'var(--font-size-sm)', color:'var(--color-text-secondary)', display:'flex', gap:8 }}>
-                <span style={{ color:'var(--color-accent-hover)', fontWeight:'bold' }}>›</span>
+                <Icon name="chevronRight" size={14} />
                 <span>{tip}</span>
               </li>
             ))}
@@ -229,7 +229,7 @@ export default function Entradas() {
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <header className="modal-header">
               <h2 className="flex items-center gap-2" style={{ fontSize: '1.25rem', fontWeight: 600 }}>Nuevo Material</h2>
-              <button className="modal-close" onClick={() => setShowNewMaterial(false)}>×</button>
+              <button className="modal-close" onClick={() => setShowNewMaterial(false)} aria-label="Cerrar" title="Cerrar"><Icon name="x" size={18} /></button>
             </header>
 
             <form className="modal-body" onSubmit={async (e) => {

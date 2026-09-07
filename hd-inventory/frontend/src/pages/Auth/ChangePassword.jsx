@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import api from '../../api/client'
+import { Icon } from '../../components/ui'
 import './ChangePassword.css'
 
 export default function ChangePassword() {
@@ -105,16 +106,16 @@ export default function ChangePassword() {
             <p className="requirements-title">Tu contraseña debe contener:</p>
             <ul className="requirements-list">
               <li className={lengthOk ? 'req-met' : ''}>
-                <span className="req-icon">{lengthOk ? '✓' : '○'}</span> Mínimo 8 caracteres
+                <span className="req-icon"><Icon name={lengthOk ? 'check' : 'circle'} size={13} /></span> Mínimo 8 caracteres
               </li>
               <li className={hasLetter ? 'req-met' : ''}>
-                <span className="req-icon">{hasLetter ? '✓' : '○'}</span> Al menos una letra
+                <span className="req-icon"><Icon name={hasLetter ? 'check' : 'circle'} size={13} /></span> Al menos una letra
               </li>
               <li className={hasNumber ? 'req-met' : ''}>
-                <span className="req-icon">{hasNumber ? '✓' : '○'}</span> Al menos un número
+                <span className="req-icon"><Icon name={hasNumber ? 'check' : 'circle'} size={13} /></span> Al menos un número
               </li>
               <li className={passwordsMatch ? 'req-met' : (confirmPassword ? 'req-error' : '')}>
-                <span className="req-icon">{passwordsMatch ? '✓' : (confirmPassword ? '✗' : '○')}</span> Las contraseñas coinciden
+                <span className="req-icon"><Icon name={passwordsMatch ? 'check' : (confirmPassword ? 'x' : 'circle')} size={13} /></span> Las contraseñas coinciden
               </li>
             </ul>
           </div>

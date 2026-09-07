@@ -107,7 +107,8 @@
 }
 
 .advance-icon {
-  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
   opacity: 0.7;
 }
 
@@ -176,7 +177,8 @@
 }
 
 .step-arrow {
-  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
   color: var(--color-text-secondary);
 }
 
@@ -392,10 +394,21 @@
 
 .btn-close {
   background: transparent;
-  border: none;
-  font-size: 1.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--color-text-secondary);
   cursor: pointer;
+  flex-shrink: 0;
+}
+
+.btn-close:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
 }
 
 .loading-state {
@@ -551,35 +564,8 @@
   flex-shrink: 0;
 }
 
-/* Filtros — fila horizontal compacta (igual que Historial) */
-.historial-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  align-items: flex-end;
-}
-
-.filter-group {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.filter-group input,
-.filter-group select {
-  width: 160px;
-  font-size: 0.8rem;
-  padding: 4px 8px;
-  height: 30px;
-}
-
-.filter-label {
-  font-size: 0.7rem;
-  font-weight: 500;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
+/* Filtros y paginación: sistema global (.filters / .pagination en index.css).
+   Aquí solo queda lo específico de Órdenes (sort-toggle). */
 
 .sort-toggle {
   display: flex;
@@ -591,19 +577,6 @@
   padding: 4px 10px;
   height: 30px;
   white-space: nowrap;
-}
-
-.filter-actions {
-  display: flex;
-  gap: var(--space-1);
-  align-items: flex-end;
-  padding-bottom: 1px;
-}
-
-.filter-actions .btn {
-  font-size: 0.8rem;
-  padding: 4px 12px;
-  height: 30px;
 }
 
 .form-section-divider {
@@ -627,41 +600,5 @@
 
 .p-4 { padding: var(--space-4); }
 
-/* Paginación */
-.historial-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-3) var(--space-4);
-  margin-top: var(--space-4);
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  flex-wrap: wrap;
-  gap: var(--space-3);
-}
-
-.pagination-info {
-  font-size: 0.85rem;
-  color: var(--color-text-secondary);
-}
-
-.pagination-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.pagination-page-size {
-  width: auto;
-  min-width: 120px;
-}
-
-.pagination-page {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--color-text-primary);
-  white-space: nowrap;
-  padding: 0 var(--space-2);
-}
+/* La paginación usa el sistema global (.pagination en index.css). */
 

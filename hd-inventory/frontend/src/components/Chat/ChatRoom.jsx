@@ -4,7 +4,8 @@ import api from '../../api/client'
 import ChatMessage from './ChatMessage'
 import ChatInput from './ChatInput'
 import ConfirmModal from '../ConfirmModal'
-import { BackIcon, SearchIcon, CloseIcon } from './ChatIcons'
+import { playChatSound } from './chatSound'
+import { BackIcon, SearchIcon, CloseIcon, RetryIcon } from './ChatIcons'
 
 export default function ChatRoom({ conversation, onBack, currentUser }) {
   const [messages, setMessages] = useState([])
@@ -13,11 +14,20 @@ export default function ChatRoom({ conversation, onBack, currentUser }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const [confirmMsg, setConfirmMsg] = useState(null)
+  const [uploadError, setUploadError] = useState(null)
+  const [uploadProgress, setUploadProgress] = useState(null)
+  const [onlineIds, setOnlineIds] = useState([])
+  const [lastSeen, setLastSeen] = useState({})
   const scrollRef = useRef(null)
 
   // WebSocket
-  const { status, sendMessage, sendTyping } = useWebSocket(conversation.id, {
+  const { status, sendMessage, sendTyping, sendHeartbeat, reconnect } = useWebSocket(conversation.id, {
     onMessage: (data) => {
+      // Sonido solo si el mensaje es de otra persona (no el eco propio)
+      const senderId = data.sender_id ?? data.sender
+      if (senderId && currentUser?.id && Number(senderId) !== Number(currentUser.id)) {
+        playChatSound()
+      }
       setMessages(prev => {
         // Evitar duplicados (si el mensaje optimista ya tiene el mismo ID o timestamp exacto)
         // El mensaje real del WS tendrá un ID de base de datos
@@ -50,8 +60,47 @@ export default function ChatRoom({ conversation, onBack, currentUser }) {
     },
     onDelete: (data) => {
       setMessages(prev => prev.filter(m => m.id !== data.id))
+    },
+    onPresence: (data) => {
+      setOnlineIds(prev => {
+        const next = new Set(prev)
+        if (data.status === 'online') next.add(data.user_id)
+        else next.delete(data.user_id)
+        return [...next]
+      })
+    },
+    onError: (data) => {
+      console.error('Chat: error del servidor:', data.detail)
     }
   })
+
+  // Snapshot inicial de presencia
+  useEffect(() => {
+    let cancelled = false
+    const fetchOnline = async () => {
+      try {
+        const res = await api.get(`/chat/conversations/${conversation.id}/online/`)
+        if (cancelled) return
+        const users = res.data.users || []
+        setOnlineIds(users.filter(u => u.online).map(u => u.user_id))
+        const seen = {}
+        users.forEach(u => { if (u.last_seen) seen[u.user_id] = u.last_seen })
+        setLastSeen(seen)
+      } catch (err) {
+        console.error('Error fetching presence', err)
+      }
+    }
+    fetchOnline()
+    return () => { cancelled = true }
+  }, [conversation.id])
+
+  // Heartbeat cada 30 s mientras hay conexión (TTL 75 s en backend)
+  useEffect(() => {
+    if (status !== 'connected') return
+    sendHeartbeat()
+    const t = setInterval(sendHeartbeat, 30000)
+    return () => clearInterval(t)
+  }, [status, sendHeartbeat])
 
   useEffect(() => {
     const fetchMessages = async () => {
@@ -79,9 +128,9 @@ export default function ChatRoom({ conversation, onBack, currentUser }) {
     }, 50)
   }
 
-  const handleSendMessage = (text) => {
+  const handleSendMessage = async (text) => {
     if (!text.trim()) return
-    
+
     // Optimistic UI: Añadir mensaje local inmediatamente
     const tempMsg = {
       id: `temp-${Date.now()}`,
@@ -93,22 +142,99 @@ export default function ChatRoom({ conversation, onBack, currentUser }) {
       message_type: 'text',
       pending: true
     }
-    
+
+    if (sendMessage(text)) {
+      setMessages(prev => [...prev, tempMsg])
+      scrollToBottom()
+      return
+    }
+
+    // Sin WS: fallback REST para no perder el mensaje
     setMessages(prev => [...prev, tempMsg])
     scrollToBottom()
-    sendMessage(text)
+    try {
+      const res = await api.post('/chat/messages/', {
+        conversation: conversation.id,
+        content: text,
+      })
+      const d = res.data
+      const realMsg = {
+        id: d.id,
+        content: d.content,
+        sender_id: d.sender,
+        sender: d.sender,
+        sender_name: d.sender_name,
+        sender_avatar: d.sender_avatar,
+        timestamp: d.timestamp,
+        message_type: d.message_type || 'text',
+      }
+      setMessages(prev => prev.map(m => m.id === tempMsg.id ? realMsg : m))
+    } catch (err) {
+      console.error('Error enviando mensaje por REST', err)
+      setMessages(prev => prev.map(m =>
+        m.id === tempMsg.id ? { ...m, pending: false, failed: true } : m
+      ))
+    }
   }
 
-  const handleSendFile = async (file) => {
+  const handleRetryMessage = (msg) => {
+    setMessages(prev => prev.filter(m => m.id !== msg.id))
+    handleSendMessage(msg.content || '')
+  }
+
+  const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
+  const handleSendFile = async (file, onProgress) => {
+    setUploadError(null)
+    if (!file) return
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setUploadError('Archivo excede 10MB.')
+      return
+    }
+    const ct = file.type || ''
+    const allowed = ct.startsWith('image/') || ct.startsWith('application/')
+      || ct.startsWith('text/') || ct.startsWith('video/') || ct.startsWith('audio/')
+    if (ct && !allowed) {
+      setUploadError(`Tipo no permitido: ${ct}`)
+      return
+    }
     const formData = new FormData()
     formData.append('file', file)
+    setUploadProgress(0)
     try {
-      // Para archivos, el mensaje aparecerá cuando el servidor confirme la subida y dispare el WS
-      await api.post(`/chat/conversations/${conversation.id}/upload_attachment/`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      // El mensaje se añade desde la respuesta: visible aunque el WS esté caído.
+      // (El eco WS posterior se deduplica por id.)
+      const res = await api.post(`/chat/conversations/${conversation.id}/upload_attachment/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (e) => {
+          if (e.total) {
+            const pct = Math.round((e.loaded * 100) / e.total)
+            setUploadProgress(pct)
+            onProgress?.(pct)
+          }
+        },
       })
+      const d = res.data
+      const msg = {
+        id: d.id,
+        content: d.content ?? '',
+        sender_id: d.sender_id ?? d.sender,
+        sender: d.sender,
+        sender_name: d.sender_name,
+        sender_avatar: d.sender_avatar,
+        timestamp: d.timestamp,
+        message_type: d.message_type || 'file',
+        attachment_url: d.attachment_url,
+        file_name: d.file_name,
+        file_size: d.file_size,
+      }
+      setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
+      scrollToBottom()
     } catch (err) {
       console.error('Error uploading file', err)
+      setUploadError(err.response?.data?.error || 'No se pudo subir el archivo.')
+    } finally {
+      setUploadProgress(null)
     }
   }
 
@@ -124,14 +250,58 @@ export default function ChatRoom({ conversation, onBack, currentUser }) {
 
   const handleDeleteMessage = async (msg) => {
     if (msg.pending) return // No eliminar mensajes temporales
+    // Optimistic UI: quitar al instante; rollback si falla
+    const snapshot = msg
+    setMessages(prev => prev.filter(m => m.id !== msg.id))
+    setConfirmMsg(null)
     try {
       await api.delete(`/chat/messages/${msg.id}/`)
-      setConfirmMsg(null)
+      // El evento WS message_deleted confirmará (no-op si ya se quitó)
     } catch (err) {
       console.error('Error deleting message', err)
+      setMessages(prev => {
+        if (prev.some(m => m.id === snapshot.id)) return prev
+        return [...prev, snapshot].sort((a, b) =>
+          new Date(a.timestamp) - new Date(b.timestamp))
+      })
       setConfirmMsg(null)
     }
   }
+
+  const handleMessageAction = (type, m) => {
+    if (type === 'delete') setConfirmMsg(m)
+    else if (type === 'retry') handleRetryMessage(m)
+  }
+
+  const formatLastSeen = (ts) => {
+    if (!ts) return null
+    const diff = Date.now() / 1000 - ts
+    if (diff < 60) return 'últ. vez hace un momento'
+    if (diff < 3600) return `últ. vez hace ${Math.floor(diff / 60)} min`
+    if (diff < 86400) return `últ. vez hace ${Math.floor(diff / 3600)} h`
+    return `últ. vez hace ${Math.floor(diff / 86400)} d`
+  }
+
+  const presenceLabel = (() => {
+    if (status !== 'connected') return null
+    if (conversation.is_group) {
+      const n = onlineIds.length
+      return n === 0 ? 'Solo tú en línea' : `${n} en línea`
+    }
+    if (onlineIds.length > 0) return 'En línea'
+    const peerSeen = Object.values(lastSeen)[0]
+    return formatLastSeen(peerSeen) || 'Desconectado'
+  })()
+
+  const statusLabel = presenceLabel || {
+    connected: 'En línea',
+    connecting: 'Conectando...',
+    disconnected: 'Reconectando...',
+    unauthorized: 'Sesión expirada',
+    forbidden: 'Sin acceso',
+    notfound: 'Conversación eliminada',
+    failed: 'Sin conexión',
+  }[status] || 'Conectando...'
 
   const filteredMessages = messages.filter(m => 
     m.content?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -141,7 +311,7 @@ export default function ChatRoom({ conversation, onBack, currentUser }) {
   return (
     <div className="chat-room">
       <div className="chat-view-header">
-        <button className="back-btn" onClick={onBack}><BackIcon /></button>
+        <button type="button" className="icon-btn back-btn" onClick={onBack} title="Volver a chats" aria-label="Volver a chats"><BackIcon /></button>
         <div className="chat-header-info">
           <div className="header-avatar">
             {conversation.display_avatar ? (
@@ -153,11 +323,16 @@ export default function ChatRoom({ conversation, onBack, currentUser }) {
           <div className="header-text">
             <div className="header-name">{conversation.display_name}</div>
             <div className={`header-status ${status}`}>
-              {status === 'connected' ? 'En línea' : 'Conectando...'}
+              {statusLabel}
+              {(status === 'failed' || status === 'disconnected') && (
+                <button type="button" className="ws-retry-btn" onClick={reconnect} title="Reintentar conexión">
+                  <RetryIcon size={12} /> Reintentar
+                </button>
+              )}
             </div>
           </div>
         </div>
-        <button className="search-toggle-btn" onClick={() => setShowSearch(!showSearch)}>
+        <button type="button" className="icon-btn search-toggle-btn" onClick={() => setShowSearch(!showSearch)} title="Buscar en la conversación" aria-label="Buscar en la conversación" aria-expanded={showSearch}>
           <SearchIcon />
         </button>
       </div>
@@ -171,7 +346,7 @@ export default function ChatRoom({ conversation, onBack, currentUser }) {
             onChange={(e) => setSearchTerm(e.target.value)}
             autoFocus
           />
-          <button onClick={() => { setSearchTerm(''); setShowSearch(false); }}><CloseIcon size={16} /></button>
+          <button type="button" className="icon-btn" onClick={() => { setSearchTerm(''); setShowSearch(false); }} title="Cerrar búsqueda" aria-label="Cerrar búsqueda"><CloseIcon size={16} /></button>
         </div>
       )}
 
@@ -186,7 +361,7 @@ export default function ChatRoom({ conversation, onBack, currentUser }) {
                 message={msg} 
                 isOwn={msg.sender_id === currentUser?.id || msg.sender === currentUser?.id}
                 onPin={handlePinMessage}
-                onAction={(type, m) => type === 'delete' ? setConfirmMsg(m) : null}
+                onAction={handleMessageAction}
               />
             ))}
             {typingUser && (
@@ -201,8 +376,12 @@ export default function ChatRoom({ conversation, onBack, currentUser }) {
       <ChatInput 
         onSendMessage={handleSendMessage} 
         onSendFile={handleSendFile}
-        onTyping={sendTyping} 
+        onTyping={sendTyping}
+        uploadProgress={uploadProgress}
       />
+      {uploadError && (
+        <div className="chat-upload-error" role="alert">{uploadError}</div>
+      )}
 
       <ConfirmModal
         open={!!confirmMsg}

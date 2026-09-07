@@ -1,6 +1,7 @@
 """inventory/views.py"""
 from django.db import transaction
 from django.db.models import F
+import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
@@ -36,12 +37,31 @@ class AreaViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
 
 
+class MovimientoFilter(django_filters.FilterSet):
+    """Rango de fechas para el Historial (los datetime-local llegan como
+    'YYYY-MM-DDTHH:MM' y DateTimeFilter los interpreta bien)."""
+    fecha_desde = django_filters.DateTimeFilter(field_name='fecha', lookup_expr='gte')
+    fecha_hasta = django_filters.DateTimeFilter(field_name='fecha', lookup_expr='lte')
+
+
+class EntradaFilter(MovimientoFilter):
+    class Meta:
+        model = Entrada
+        fields = ['material', 'registrado_por', 'proveedor']
+
+
+class SalidaFilter(MovimientoFilter):
+    class Meta:
+        model = Salida
+        fields = ['material', 'linea', 'area', 'turno', 'registrado_por']
+
+
 class EntradaViewSet(viewsets.ModelViewSet):
     queryset = Entrada.objects.select_related('material', 'registrado_por').order_by('-fecha')
     serializer_class = EntradaSerializer
     permission_classes = [IsAuthenticated, IsCapturistaOrAboveOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['material', 'registrado_por', 'proveedor']
+    filterset_class = EntradaFilter
     search_fields = ['material__code', 'material__name', 'proveedor', 'numero_orden']
     ordering_fields = ['fecha', 'material__code']
     ordering = ['-fecha']
@@ -57,13 +77,26 @@ class SalidaViewSet(viewsets.ModelViewSet):
     serializer_class = SalidaSerializer
     permission_classes = [IsAuthenticated, IsCapturistaOrAboveOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['material', 'linea', 'area', 'turno', 'registrado_por']
+    filterset_class = SalidaFilter
     search_fields = ['material__code', 'material__name', 'recibio', 'empleado_no']
     ordering_fields = ['fecha', 'material__code']
     ordering = ['-fecha']
 
     def perform_create(self, serializer):
-        serializer.save(registrado_por=self.request.user)
+        from rest_framework.exceptions import ValidationError
+        from apps.materials.models import Material
+        with transaction.atomic():
+            material = serializer.validated_data.get('material')
+            cantidad = serializer.validated_data.get('cantidad', 0) or 0
+            if material and cantidad:
+                locked = Material.objects.select_for_update().get(pk=material.pk)
+                if locked.stock_actual < cantidad:
+                    raise ValidationError({
+                        'cantidad': (
+                            f'Stock insuficiente. Disponible: {locked.stock_actual}.'
+                        )
+                    })
+            serializer.save(registrado_por=self.request.user)
 
     @action(detail=False, methods=['get'])
     def choices(self, request):
@@ -78,34 +111,59 @@ class SalidaViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def bulk(self, request):
-        """Crear múltiples salidas en una sola request (desde el carrito de despacho)."""
+        """Crear múltiples salidas en una sola request (desde el carrito de despacho).
+
+        Todo-o-nada: si un item falla (stock, validación), se revierte todo
+        para no dejar stock parcial. Límite 100 items por request.
+        """
+        from rest_framework.exceptions import ValidationError
+        from apps.materials.models import Material
         items = request.data.get('items', [])
         if not items:
             return Response({'detail': 'No hay items en la solicitud.'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(items) > 100:
+            return Response(
+                {'detail': 'Máximo 100 items por solicitud bulk.'},
+                status=status.HTTP_400_BAD_REQUEST)
 
-        registros = []
-        errores = []
-
-        for item in items:
-            data = {
-                'material': item.get('material'),
-                'cantidad': item.get('cantidad'),
-                'linea': request.data.get('linea'),
-                'area': request.data.get('area'),
-                'turno': request.data.get('turno'),
-                'empleado_no': request.data.get('empleado_no'),
-                'recibio': request.data.get('recibio'),
-                'observaciones': item.get('observaciones', request.data.get('observaciones', '')),
-            }
-            serializer = self.get_serializer(data=data)
-            if serializer.is_valid():
-                self.perform_create(serializer)
-                registros.append(serializer.data)
-            else:
-                errores.append({'item': item, 'errors': serializer.errors})
-
-        if errores:
-            return Response({'registrados': registros, 'errors': errores}, status=status.HTTP_207_MULTI_STATUS)
+        try:
+            with transaction.atomic():
+                registros = []
+                # Lock de todos los materiales involucrados (ordenado = anti-deadlock)
+                material_ids = {i.get('material') for i in items if i.get('material')}
+                locked = {
+                    m.pk: m for m in Material.objects.select_for_update()
+                    .filter(pk__in=material_ids).order_by('pk')
+                }
+                for item in items:
+                    data = {
+                        'material': item.get('material'),
+                        'cantidad': item.get('cantidad'),
+                        'linea': request.data.get('linea'),
+                        'area': request.data.get('area'),
+                        'turno': request.data.get('turno'),
+                        'empleado_no': request.data.get('empleado_no'),
+                        'recibio': request.data.get('recibio'),
+                        'observaciones': item.get('observaciones', request.data.get('observaciones', '')),
+                    }
+                    serializer = self.get_serializer(data=data)
+                    serializer.is_valid(raise_exception=True)
+                    mat = locked.get(data['material'])
+                    if mat and (data['cantidad'] or 0) > mat.stock_actual:
+                        raise ValidationError({
+                            'cantidad': (
+                                f'Stock insuficiente para {mat.code}. '
+                                f'Disponible: {mat.stock_actual}.'
+                            )
+                        })
+                    self.perform_create(serializer)
+                    registros.append(serializer.data)
+                    # Descuenta del lock local para validar acumulado del mismo
+                    # material dentro del bulk
+                    if mat:
+                        mat.stock_actual -= (data['cantidad'] or 0)
+        except ValidationError as exc:
+            return Response({'detail': exc.detail}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(registros, status=status.HTTP_201_CREATED)
 

@@ -70,7 +70,8 @@ class Area(models.Model):
         unique_together = ('nombre', 'linea')
 
     def __str__(self):
-        return f"{self.linea.nombre} - {self.nombre}"
+        linea_nombre = self.linea.nombre if self.linea else 'Sin línea'
+        return f"{linea_nombre} - {self.nombre}"
 
 
 class Entrada(models.Model):
@@ -330,7 +331,18 @@ class Vale(models.Model):
         return f"Vale #{self.recibo_no or self.pk}"
 
     def save(self, *args, **kwargs):
+        from django.db import transaction, IntegrityError
         if not self.recibo_no:
+            for _ in range(3):
+                try:
+                    with transaction.atomic():
+                        last = Vale.objects.select_for_update().order_by('-recibo_no').first()
+                        self.recibo_no = (last.recibo_no if last and last.recibo_no else 0) + 1
+                        return super().save(*args, **kwargs)
+                except IntegrityError:
+                    self.recibo_no = None
+                    continue
+            # Último intento fuera del retry para propagar error real
             last = Vale.objects.order_by('-recibo_no').first()
             self.recibo_no = (last.recibo_no if last and last.recibo_no else 0) + 1
         return super().save(*args, **kwargs)

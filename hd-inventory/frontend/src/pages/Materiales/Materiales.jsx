@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { usePersistentState } from '../../hooks/usePersistentState'
 import api from '../../api/client'
+import { Icon, SearchField } from '../../components/ui'
 import './Materiales.css'
 import MaterialModal from './MaterialModal'
 import ReportModal from './ReportModal'
@@ -33,43 +34,41 @@ export default function Materiales() {
 
   useEffect(() => { fetchMateriales() }, [fetchMateriales])
 
-  const handleSearch = (e) => { setSearch(e.target.value); setPage(1) }
+  const handleSearch = (v) => { setSearch(v); setPage(1) }
   const handleEstado = (e) => { setEstado(e.target.value); setPage(1) }
 
   return (
     <div>
-      <div className="page-header" style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
-        <div>
+      <div className="page-header">
+        <div className="page-header-text">
           <h1 className="page-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+            <Icon name="box" size={20} />
             Materiales
           </h1>
           <p className="page-subtitle">Catálogo del almacén — {count} materiales</p>
         </div>
-          <button 
+        <div className="page-actions">
+          <button
             className="btn btn-primary"
             onClick={() => { setModalMaterial(null); setIsModalOpen(true); }}
           >
-            + Nuevo Material
+            <Icon name="plus" size={15} /> Nuevo material
           </button>
           <button
             className="btn btn-secondary"
-            style={{ marginLeft: 8 }}
             onClick={() => setIsReportOpen(true)}
           >
-            Generar reporte
+            <Icon name="download" size={15} /> Generar reporte
           </button>
+        </div>
       </div>
 
       {/* ─── Filtros ───────────────────────────────────── */}
       <div className="materiales-filters card mb-6">
-        <input
-          className="form-control"
-          type="text"
-          placeholder="Buscar por código o nombre..."
+        <SearchField
           value={search}
           onChange={handleSearch}
-          style={{ flex: 1 }}
+          placeholder="Buscar por código o nombre..."
         />
         <select
           className="form-control"
@@ -151,19 +150,19 @@ export default function Materiales() {
 
       {/* Paginación */}
       {count > PAGE_SIZE && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-4)' }}>
-          <span className="text-muted text-sm">
+        <div className="pagination">
+          <span className="pagination-info">
             Mostrando {(page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, count)} de {count} materiales
           </span>
-          <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+          <div className="pagination-controls">
             <button
               className="btn btn-secondary btn-sm"
               disabled={page <= 1}
               onClick={() => setPage(p => Math.max(1, p - 1))}
             >
-              &laquo; Anterior
+              <Icon name="chevronLeft" size={15} /> Anterior
             </button>
-            <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>
+            <span className="pagination-page">
               Pág. {page} de {Math.ceil(count / PAGE_SIZE)}
             </span>
             <button
@@ -171,7 +170,7 @@ export default function Materiales() {
               disabled={page >= Math.ceil(count / PAGE_SIZE)}
               onClick={() => setPage(p => p + 1)}
             >
-              Siguiente &raquo;
+              Siguiente <Icon name="chevronRight" size={15} />
             </button>
           </div>
         </div>

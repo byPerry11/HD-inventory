@@ -12,7 +12,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 10s
@@ -24,8 +24,13 @@ services:
     image: redis:7-alpine
     container_name: hdinventory_redis
     restart: unless-stopped
+    command: sh -c "redis-server --requirepass $${REDIS_PASSWORD:-hdredis2026}"
+    env_file:
+      - .env
+    volumes:
+      - redisdata:/data
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -43,27 +48,25 @@ services:
       - .env
     environment:
       - DB_HOST=db
+      - REDIS_HOST=redis
     volumes:
-      - ./backend:/app
       - ./media:/app/media
       - static_volume:/app/staticfiles
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8000/health/"]
       interval: 30s
       timeout: 10s
       start_period: 40s
       retries: 5
-    command: >
-      sh -c "python manage.py collectstatic --noinput &&
-             python manage.py migrate --noinput &&
-             uvicorn core_main_hdinventory.asgi:application --host 0.0.0.0 --port 8000"
+    # Arranque vía ENTRYPOINT de la imagen (collectstatic + migrate + uvicorn
+    # como appuser tras fijar permisos de volúmenes).
 
   # ─── Frontend React (Development Server) ────────────────────
   frontend-dev:
@@ -75,7 +78,9 @@ services:
     env_file:
       - .env
     ports:
-      - "5173:5173"
+      - "127.0.0.1:5173:5173"
+    profiles:
+      - dev
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -105,5 +110,7 @@ services:
 volumes:
   pgdata:
     name: hdinventory_pgdata
+  redisdata:
+    name: hdinventory_redisdata
   static_volume:
     name: hdinventory_static_volume

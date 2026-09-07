@@ -34,8 +34,7 @@ db.sqlite3
 db.sqlite3-journal
 backend/staticfiles/
 backend/media/
-backend/core_main_hdinventory/migrations/
-backend/apps/*/migrations/
+# NOTA: las migrations SÍ se versionan (necesarias para DB consistentes).
 
 # Media uploads — ignorar archivos pero conservar la carpeta
 media/*
@@ -70,6 +69,12 @@ Thumbs.db
 
 # Backups / archivos externos
 respaldo de inventario para cargar/
+../respaldo de inventario para cargar/
 *.xlsm
 *.xlsx
 !frontend/src/**/*.xlsx
+
+# Documentos y agentes locales (no versionar)
+*.docx
+.agent/
+.hd-inventory-agent/

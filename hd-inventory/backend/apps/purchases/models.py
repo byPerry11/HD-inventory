@@ -246,79 +246,80 @@ class OrdenCompra(models.Model):
         return None
 
     def save(self, *args, **kwargs):
-        # Auto-registro de proveedor: si la orden tiene nombre de vendedor,
-        # se persiste/vincula al catálogo de proveedores (case-insensitive).
-        if self.vendedor and self.vendedor.strip():
-            self.proveedor_ref = Proveedor.get_or_create_canonical(self.vendedor)
-        else:
-            self.proveedor_ref = None
+        from django.db import transaction
+        with transaction.atomic():
+            # Auto-registro de proveedor: si la orden tiene nombre de vendedor,
+            # se persiste/vincula al catálogo de proveedores (case-insensitive).
+            if self.vendedor and self.vendedor.strip():
+                self.proveedor_ref = Proveedor.get_or_create_canonical(self.vendedor)
+            else:
+                self.proveedor_ref = None
 
-        now = timezone.now()
-        today = now.date()
+            now = timezone.now()
 
-        # Si es nueva, o cambió el status, capturamos fechas
-        is_new = self.pk is None
-        old_status = getattr(self, '_loaded_values', {}).get('status', self.status)
-        status_changed = is_new or (self.status != old_status)
+            # Si es nueva, o cambió el status, capturamos fechas
+            is_new = self.pk is None
+            old_status = getattr(self, '_loaded_values', {}).get('status', self.status)
+            status_changed = is_new or (self.status != old_status)
 
-        if status_changed:
-            # Limpieza de fechas y campos según el estado al transicionar,
-            # para evitar inconsistencias (solo al cambiar de status).
-            if self.status not in ('recibido', 'rem_recibido'):
-                self.fecha_recibido = None
-                self.recibido_por = ''
-            if self.status not in ('ordenado', 'recibido', 'rem_recibido'):
-                self.fecha_ordenado = None
-            if self.status not in ('po_aprobada', 'ordenado', 'recibido', 'rem_recibido'):
-                self.fecha_po_aprobada = None
-            if self.status not in ('pr_aprobada', 'po_aprobada', 'ordenado', 'recibido', 'rem_recibido'):
-                self.fecha_pr_aprobada = None
+            if status_changed:
+                # Limpieza de fechas y campos según el estado al transicionar,
+                # para evitar inconsistencias (solo al cambiar de status).
+                if self.status not in ('recibido', 'rem_recibido'):
+                    self.fecha_recibido = None
+                    self.recibido_por = ''
+                if self.status not in ('ordenado', 'recibido', 'rem_recibido'):
+                    self.fecha_ordenado = None
+                if self.status not in ('po_aprobada', 'ordenado', 'recibido', 'rem_recibido'):
+                    self.fecha_po_aprobada = None
+                if self.status not in ('pr_aprobada', 'po_aprobada', 'ordenado', 'recibido', 'rem_recibido'):
+                    self.fecha_pr_aprobada = None
 
-            if self.status in ('pr_creada', 'pedido_rem') and not self.fecha_pr:
-                self.fecha_pr = now
-            elif self.status == 'pr_aprobada' and not self.fecha_pr_aprobada:
-                self.fecha_pr_aprobada = now
-            elif self.status == 'po_aprobada' and not self.fecha_po_aprobada:
-                self.fecha_po_aprobada = now
-            elif self.status == 'ordenado' and not self.fecha_ordenado:
-                self.fecha_ordenado = now
-            elif self.status in ('recibido', 'rem_recibido') and not self.fecha_recibido:
-                self.fecha_recibido = now
+                if self.status in ('pr_creada', 'pedido_rem') and not self.fecha_pr:
+                    self.fecha_pr = now
+                elif self.status == 'pr_aprobada' and not self.fecha_pr_aprobada:
+                    self.fecha_pr_aprobada = now
+                elif self.status == 'po_aprobada' and not self.fecha_po_aprobada:
+                    self.fecha_po_aprobada = now
+                elif self.status == 'ordenado' and not self.fecha_ordenado:
+                    self.fecha_ordenado = now
+                elif self.status in ('recibido', 'rem_recibido') and not self.fecha_recibido:
+                    self.fecha_recibido = now
 
-        super().save(*args, **kwargs)
+            super().save(*args, **kwargs)
 
-        # Actualizar stock DESPUÉS de guardar, solo en la transición → recibido / rem_recibido
-        was_received = old_status in ('recibido', 'rem_recibido') and not is_new
-        is_received = self.status in ('recibido', 'rem_recibido')
+            # Actualizar stock DESPUÉS de guardar, solo en la transición → recibido / rem_recibido
+            was_received = old_status in ('recibido', 'rem_recibido') and not is_new
+            is_received = self.status in ('recibido', 'rem_recibido')
 
-        if is_received and not was_received:
-            self._material_creado_inactivo = self._actualizar_stock()
-        elif was_received and not is_received:
-            self._revertir_stock()
+            if is_received and not was_received:
+                self._material_creado_inactivo = self._actualizar_stock()
+            elif was_received and not is_received:
+                self._revertir_stock()
 
-        # Actualizar los valores cargados en memoria
-        if hasattr(self, '_loaded_values'):
-            self._loaded_values['status'] = self.status
-        else:
-            self._loaded_values = {'status': self.status}
+            # Actualizar los valores cargados en memoria
+            if hasattr(self, '_loaded_values'):
+                self._loaded_values['status'] = self.status
+            else:
+                self._loaded_values = {'status': self.status}
 
     def _revertir_stock(self):
         """
-        Revierte el stock del material vinculado al sacar una orden del estado
-        recibido/rem_recibido, eliminando la Entrada de trazabilidad asociada.
-
-        La resta del stock la ejecuta el signal post_delete de Entrada
-        (apps/inventory/signals.py), que es la única fuente de verdad para
-        mantener el stock consistente.
+        Revierte el stock al sacar una orden de recibido/rem_recibido,
+        eliminando UNA sola Entrada de trazabilidad (la más reciente que
+        coincida). La resta la ejecuta el signal post_delete de Entrada,
+        única fuente de verdad del stock.
         """
         if self.material:
             from apps.inventory.models import Entrada
 
-            Entrada.objects.filter(
+            entrada = Entrada.objects.filter(
                 material=self.material,
                 cantidad=self.cantidad,
                 numero_orden=self.po_number or f'OC-{self.pk}'
-            ).delete()
+            ).order_by('-id').first()
+            if entrada:
+                entrada.delete()
 
     def _actualizar_stock(self) -> bool:
         """

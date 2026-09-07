@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { Icon } from '../../components/ui'
 import './Login.css'
 
 export default function Login() {
@@ -38,7 +39,7 @@ export default function Login() {
       <div className="login-container">
         {/* Logo */}
         <div className="login-brand">
-          <span className="login-logo">⬡</span>
+          <span className="login-logo"><Icon name="hexagon" size={44} /></span>
           <h1 className="login-title">Almacén de Materiales PE</h1>
           <p className="login-subtitle">Sistema de Control de Inventario</p>
         </div>
@@ -49,7 +50,7 @@ export default function Login() {
 
           {error && (
             <div className="alert alert-error">
-              <span>⚠</span>
+              <Icon name="alert" size={16} />
               <span>{error}</span>
             </div>
           )}

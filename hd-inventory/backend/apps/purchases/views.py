@@ -1,7 +1,6 @@
 """purchases/views.py — ViewSet de Órdenes de Compra y Proveedores."""
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
@@ -56,8 +55,8 @@ class OrdenCompraViewSet(viewsets.ModelViewSet):
     ordering           = ['-fecha_emision']
 
     def get_permissions(self):
-        if self.action in ('destroy', 'cancel_order'):
-            return [IsAuthenticated()]
+        # destroy/cancel requieren supervisor+: antes degradaba a IsAuthenticated
+        # y cualquier capturista podía borrar/cancelar OCs.
         return super().get_permissions()
 
     def get_serializer_class(self):
@@ -73,8 +72,7 @@ class OrdenCompraViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         """
-        Eliminación definitiva de la orden.
-        Cualquier usuario autenticado puede ejecutar esta acción.
+        Eliminación definitiva de la orden (solo supervisor/manager).
         Las referencias (material, proveedor_ref) usan SET_NULL, por lo que
         la cascada no rompe el inventario ni el catálogo de proveedores.
         """

@@ -1,7 +1,9 @@
 """inventory/serializers.py"""
+from django.db import transaction
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import Entrada, Salida, Area, Linea, TURNO_CHOICES, Vale, ValeItem, Empleado
+from apps.materials.models import Material
 from apps.materials.serializers import MaterialListSerializer
 
 User = get_user_model()
@@ -103,16 +105,26 @@ class SalidaSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
     def validate(self, data):
-        """Valida que haya stock suficiente antes de registrar la salida."""
-        material = data.get('material')
-        cantidad = data.get('cantidad', 0)
-        if material and material.stock_actual < cantidad:
+        """Valida stock suficiente (chequeo rápido; el lock real va en la vista)."""
+        material = data.get('material') or getattr(self.instance, 'material', None)
+        cantidad = data.get('cantidad', getattr(self.instance, 'cantidad', 0) or 0)
+        if cantidad is not None and cantidad <= 0:
             raise serializers.ValidationError({
-                'cantidad': (
-                    f'Stock insuficiente. Disponible: {material.stock_actual} '
-                    f'{material.get_unit_display()}.'
-                )
+                'cantidad': 'La cantidad debe ser mayor a 0.'
             })
+        if material and cantidad:
+            # Refresca stock desde DB para no validar con instancia stale
+            try:
+                stock = Material.objects.values_list('stock_actual', flat=True).get(pk=material.pk)
+            except Material.DoesNotExist:
+                raise serializers.ValidationError({'material': 'Material no existe.'})
+            if stock < cantidad:
+                raise serializers.ValidationError({
+                    'cantidad': (
+                        f'Stock insuficiente. Disponible: {stock} '
+                        f'{material.get_unit_display()}.'
+                    )
+                })
         return data
 
 
@@ -175,16 +187,82 @@ class ValeSerializer(serializers.ModelSerializer):
                 defaults={'nombre': nombre}
             )
 
+    def validate(self, data):
+        """Valida stock suficiente para vales multi-item y legacy."""
+        items = data.get('items', None)
+        salida = data.get('salida', getattr(self.instance, 'salida', None))
+        # Si está vinculado a Salida no descuenta stock: no validar
+        if salida:
+            return data
+        if items:
+            for idx, item in enumerate(items):
+                material = item.get('material')
+                cantidad = item.get('cantidad', 0) or 0
+                if cantidad <= 0:
+                    raise serializers.ValidationError({
+                        'items': f'Item {idx}: la cantidad debe ser mayor a 0.'
+                    })
+                if material:
+                    try:
+                        stock = Material.objects.values_list(
+                            'stock_actual', flat=True).get(pk=material.pk)
+                    except Material.DoesNotExist:
+                        raise serializers.ValidationError({
+                            'items': f'Item {idx}: material no existe.'
+                        })
+                    if stock < cantidad:
+                        raise serializers.ValidationError({
+                            'items': (
+                                f'Item {idx}: stock insuficiente para '
+                                f'{material.code}. Disponible: {stock}.'
+                            )
+                        })
+        else:
+            material = data.get('material', getattr(self.instance, 'material', None))
+            cantidad = data.get('cantidad', getattr(self.instance, 'cantidad', 0) or 0)
+            if material and cantidad:
+                try:
+                    stock = Material.objects.values_list(
+                        'stock_actual', flat=True).get(pk=material.pk)
+                except Material.DoesNotExist:
+                    raise serializers.ValidationError({'material': 'Material no existe.'})
+                if stock < cantidad:
+                    raise serializers.ValidationError({
+                        'cantidad': f'Stock insuficiente. Disponible: {stock}.'
+                    })
+        return data
+
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
         validated_data['registrado_por'] = self.context['request'].user
 
         self._persist_empleado(validated_data)
 
-        vale = super().create(validated_data)
+        with transaction.atomic():
+            # Lock de materiales para validación TOCTOU
+            for item_data in items_data:
+                mat = Material.objects.select_for_update().get(
+                    pk=item_data['material'].pk)
+                if mat.stock_actual < item_data['cantidad']:
+                    raise serializers.ValidationError({
+                        'items': (
+                            f'Stock insuficiente para {mat.code}. '
+                            f'Disponible: {mat.stock_actual}.'
+                        )
+                    })
+            if not items_data and validated_data.get('material'):
+                mat = Material.objects.select_for_update().get(
+                    pk=validated_data['material'].pk)
+                cant = validated_data.get('cantidad') or 0
+                if cant and mat.stock_actual < cant:
+                    raise serializers.ValidationError({
+                        'cantidad': f'Stock insuficiente. Disponible: {mat.stock_actual}.'
+                    })
 
-        for item_data in items_data:
-            ValeItem.objects.create(vale=vale, **item_data)
+            vale = super().create(validated_data)
+
+            for item_data in items_data:
+                ValeItem.objects.create(vale=vale, **item_data)
 
         return vale
 
@@ -192,11 +270,27 @@ class ValeSerializer(serializers.ModelSerializer):
         items_data = validated_data.pop('items', None)
         self._persist_empleado(validated_data)
 
-        vale = super().update(instance, validated_data)
-
-        if items_data is not None:
-            vale.items.all().delete()
-            for item_data in items_data:
-                ValeItem.objects.create(vale=vale, **item_data)
+        with transaction.atomic():
+            # select_for_update del vale para serializar ediciones concurrentes
+            instance = Vale.objects.select_for_update().get(pk=instance.pk)
+            if items_data is not None:
+                # El delete dispara signals que devuelven stock viejo;
+                # los creates descuentan el nuevo. Todo en la misma tx.
+                instance.items.all().delete()
+                for item_data in items_data:
+                    mat = Material.objects.select_for_update().get(
+                        pk=item_data['material'].pk)
+                    if mat.stock_actual < item_data['cantidad']:
+                        raise serializers.ValidationError({
+                            'items': (
+                                f'Stock insuficiente para {mat.code}. '
+                                f'Disponible: {mat.stock_actual}.'
+                            )
+                        })
+                vale = super().update(instance, validated_data)
+                for item_data in items_data:
+                    ValeItem.objects.create(vale=vale, **item_data)
+            else:
+                vale = super().update(instance, validated_data)
 
         return vale

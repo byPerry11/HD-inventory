@@ -84,7 +84,11 @@ class ConsumoPorLineaView(APIView):
     permission_classes = [IsSupervisorOrAbove]
 
     def get(self, request):
-        dias = int(request.query_params.get('dias', 30))
+        try:
+            dias = int(request.query_params.get('dias', 30))
+        except (TypeError, ValueError):
+            dias = 30
+        dias = max(1, min(dias, 365))
         desde = timezone.now() - timedelta(days=dias)
 
         # Salidas
@@ -151,8 +155,16 @@ class TopSalidasView(APIView):
     permission_classes = [IsSupervisorOrAbove]
 
     def get(self, request):
-        dias = int(request.query_params.get('dias', 30))
-        limite = int(request.query_params.get('limite', 10))
+        try:
+            dias = int(request.query_params.get('dias', 30))
+        except (TypeError, ValueError):
+            dias = 30
+        try:
+            limite = int(request.query_params.get('limite', 10))
+        except (TypeError, ValueError):
+            limite = 10
+        dias = max(1, min(dias, 365))
+        limite = max(1, min(limite, 100))
         desde = timezone.now() - timedelta(days=dias)
 
         # Salidas agrupadas por material
@@ -469,7 +481,11 @@ class ConsumoPorAreaView(APIView):
     permission_classes = [IsSupervisorOrAbove]
 
     def get(self, request):
-        dias = int(request.query_params.get('dias', 30))
+        try:
+            dias = int(request.query_params.get('dias', 30))
+        except (TypeError, ValueError):
+            dias = 30
+        dias = max(1, min(dias, 365))
         linea_filter = request.query_params.get('linea', None)
         desde = timezone.now() - timedelta(days=dias)
 

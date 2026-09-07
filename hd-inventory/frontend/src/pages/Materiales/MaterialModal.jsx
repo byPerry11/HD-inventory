@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import client from '../../api/client'
 import { useToast } from '../../context/ToastContext'
 import ConfirmModal from '../../components/ConfirmModal'
+import { Icon } from '../../components/ui'
 import './MaterialModal.css'
 
 export default function MaterialModal({ material, onClose, onSaved }) {
@@ -163,7 +164,7 @@ export default function MaterialModal({ material, onClose, onSaved }) {
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{isEdit ? 'Editar Material' : 'Nuevo Material'}</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <button className="modal-close" onClick={onClose} aria-label="Cerrar" title="Cerrar"><Icon name="x" size={18} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="modal-body">
@@ -199,7 +200,7 @@ export default function MaterialModal({ material, onClose, onSaved }) {
                   onClick={() => setIsNewCategory(!isNewCategory)}
                   style={{ background: 'none', border: 'none', color: 'var(--color-accent)', cursor: 'pointer', fontSize: '0.85rem' }}
                 >
-                  {isNewCategory ? 'Seleccionar existente' : '+ Nueva'}
+                  {isNewCategory ? 'Seleccionar existente' : 'Nueva categoría'}
                 </button>
               </div>
               {isNewCategory ? (

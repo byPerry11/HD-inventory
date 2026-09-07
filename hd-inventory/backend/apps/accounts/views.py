@@ -27,22 +27,34 @@ class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        from rest_framework import status as drf_status
+        refresh_token = request.data.get('refresh')
+        if not refresh_token:
+            return Response({'detail': 'Refresh token requerido.'}, status=drf_status.HTTP_400_BAD_REQUEST)
         try:
-            refresh_token = request.data.get('refresh')
             token = RefreshToken(refresh_token)
             token.blacklist()
             return Response({'detail': 'Sesión cerrada correctamente.'})
         except Exception:
-            return Response({'detail': 'Token inválido.'}, status=400)
+            return Response({'detail': 'Token inválido.'}, status=drf_status.HTTP_400_BAD_REQUEST)
 
 class UserListView(APIView):
-    """Lista todos los usuarios para iniciar chats."""
+    """Lista usuarios para iniciar chats (paginado + búsqueda)."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         from .models import User
-        users = User.objects.all().exclude(id=request.user.id)
-        serializer = UserSerializer(users, many=True)
+        from core_main_hdinventory.pagination import CustomPagination
+        qs = User.objects.all().exclude(id=request.user.id).order_by('username')
+        q = request.query_params.get('search', '').strip()
+        if q:
+            from django.db.models import Q
+            qs = qs.filter(Q(username__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q))
+        paginator = CustomPagination()
+        page = paginator.paginate_queryset(qs, request)
+        serializer = UserSerializer(page if page is not None else qs, many=True)
+        if page is not None:
+            return paginator.get_paginated_response(serializer.data)
         return Response(serializer.data)
 
 class ChangePasswordView(APIView):

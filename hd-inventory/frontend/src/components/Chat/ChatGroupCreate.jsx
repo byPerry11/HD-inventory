@@ -53,7 +53,7 @@ export default function ChatGroupCreate({ onBack, onCreateSuccess }) {
   return (
     <div className="chat-group-create">
       <div className="chat-view-header">
-        <button className="back-btn" onClick={onBack}><BackIcon /></button>
+        <button type="button" className="icon-btn back-btn" onClick={onBack} title="Volver" aria-label="Volver"><BackIcon /></button>
         <h3>Crear Grupo</h3>
       </div>
 

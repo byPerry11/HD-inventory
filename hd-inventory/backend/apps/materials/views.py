@@ -33,7 +33,7 @@ class MaterialViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = MaterialFilter
     search_fields = ['code', 'name', 'descripcion']
-    ordering_fields = ['name', 'code', 'stock_actual', 'estado', 'actualizado_en']
+    ordering_fields = ['name', 'code', 'stock_actual', 'actualizado_en']
     ordering = ['name']
 
     def get_serializer_class(self):

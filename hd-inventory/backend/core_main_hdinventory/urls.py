@@ -16,7 +16,15 @@ admin.site.index_title = settings.ADMIN_INDEX_TITLE
 
 @require_GET
 def health_check(request):
-    return JsonResponse({"status": "healthy"})
+    from django.db import connections
+    from django.db.utils import OperationalError
+    try:
+        connections['default'].cursor()
+        db_ok = True
+    except OperationalError:
+        db_ok = False
+    payload = {"status": "healthy" if db_ok else "degraded", "db": "up" if db_ok else "down"}
+    return JsonResponse(payload, status=200 if db_ok else 503)
 
 
 urlpatterns = [

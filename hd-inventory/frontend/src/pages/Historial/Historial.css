@@ -49,97 +49,26 @@
   width: 100%;
 }
 
-.pagination-count-badge {
-  margin-left: auto;
-  font-size: 0.85rem;
-  color: var(--color-text-secondary);
-  background: var(--color-bg-hover);
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-sm);
-  white-space: nowrap;
-}
-
-/* Filters — compact horizontal row */
-.historial-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  align-items: flex-end;
-}
-
-.filter-group {
+/* Búsqueda unificada: barra principal + fila secundaria de filtros */
+.historial-search-card {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-}
-
-.filter-group input,
-.filter-group select {
-  width: 160px;
-  font-size: 0.8rem;
-  padding: 4px 8px;
-  height: 30px;
-}
-
-.filter-group input[type="datetime-local"] {
-  width: 200px;
-}
-
-.filter-label {
-  font-size: 0.7rem;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-.filter-actions {
-  display: flex;
-  gap: var(--space-1);
-  align-items: flex-end;
-  padding-bottom: 1px;
-}
-
-.filter-actions .btn {
-  font-size: 0.8rem;
-  padding: 4px 12px;
-  height: 30px;
-}
-
-/* Pagination */
-.historial-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-3) var(--space-4);
-  margin-top: var(--space-4);
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  flex-wrap: wrap;
   gap: var(--space-3);
 }
 
-.pagination-info {
-  font-size: 0.85rem;
-  color: var(--color-text-secondary);
+.historial-search-card > .search-field-group {
+  width: 100%;
 }
 
-.pagination-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+.historial-search-card > .search-field-group .search-field > .form-control.search-field-input {
+  height: 42px;
+  font-size: var(--font-size-base);
 }
 
-.pagination-page-size {
-  width: auto;
-  min-width: 120px;
-}
-
-.pagination-page {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--color-text-primary);
+.sort-toggle-btn {
   white-space: nowrap;
-  padding: 0 var(--space-2);
+  height: 32px;
 }
+
+/* Los filtros, la paginación y el contador usan el sistema global
+   (.filters / .pagination / .pagination-count en index.css). */

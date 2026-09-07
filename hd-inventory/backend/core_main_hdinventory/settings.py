@@ -11,11 +11,12 @@ from decouple import config, Csv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ─── Seguridad ───────────────────────────────────────────────
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me')
-DEBUG = config('DEBUG', default=True, cast=bool)
+# Sin defaults inseguros: en prod .env debe definir SECRET_KEY y DB_PASSWORD.
+SECRET_KEY = config('SECRET_KEY')
+DEBUG = config('DEBUG', default=False, cast=bool)
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
-    default='localhost,127.0.0.1,backend,0.0.0.0,mxtjsf225,mxtjsf225.tpvaoc.com,mxtj225.inventory,192.168.10.163',
+    default='localhost,127.0.0.1,backend,mxtjsf225,mxtjsf225.tpvaoc.com,mxtj225.inventory,192.168.10.163',
     cast=Csv()
 )
 
@@ -78,11 +79,17 @@ WSGI_APPLICATION = 'core_main_hdinventory.wsgi.application'
 ASGI_APPLICATION = 'core_main_hdinventory.asgi.application'
 
 # ─── Configuración de Channels (Redis) ────────────────────────
+_channel_redis_password = config('REDIS_PASSWORD', default=None)
+_channel_redis_host = config('REDIS_HOST', default='redis')
+if _channel_redis_password:
+    _channel_redis_url = f"redis://:{_channel_redis_password}@{_channel_redis_host}:6379/0"
+else:
+    _channel_redis_url = f"redis://{_channel_redis_host}:6379/0"
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [(config('REDIS_HOST', default='redis'), 6379)],
+            "hosts": [_channel_redis_url],
         },
     },
 }
@@ -93,9 +100,10 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': config('DB_NAME', default='hdinventory'),
         'USER': config('DB_USER', default='hduser'),
-        'PASSWORD': config('DB_PASSWORD', default='hdpassword2026'),
+        'PASSWORD': config('DB_PASSWORD'),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='5432'),
+        'CONN_MAX_AGE': config('DB_CONN_MAX_AGE', default=60, cast=int),
     }
 }
 
@@ -145,6 +153,14 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'core_main_hdinventory.pagination.CustomPagination',
     'PAGE_SIZE': 50,
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '30/min',
+        'user': '300/min',
+    },
 }
 
 # ─── JWT ─────────────────────────────────────────────────────
@@ -208,3 +224,15 @@ STORAGES = {
 ADMIN_SITE_HEADER = 'Almacén de Materiales PE — Admin'
 ADMIN_SITE_TITLE = 'HD Inventory Admin'
 ADMIN_INDEX_TITLE = 'Panel de Administración'
+
+# ─── Hardening prod (solo cuando DEBUG=False) ─────────────────
+if not DEBUG:
+    SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=31536000, cast=int)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = 'same-origin'
+    X_FRAME_OPTIONS = 'DENY'

@@ -64,8 +64,10 @@
 }
 
 .login-logo {
-  font-size: 52px;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-accent-hover);
   filter: drop-shadow(0 0 20px rgba(31,111,235,0.6));
   margin-bottom: var(--space-4);
   animation: logo-pulse 3s ease-in-out infinite;

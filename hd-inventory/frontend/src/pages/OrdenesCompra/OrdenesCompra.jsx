@@ -3,6 +3,7 @@ import api from '../../api/client'
 import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
 import ConfirmModal from '../../components/ConfirmModal'
+import { Icon, SearchField } from '../../components/ui'
 import './OrdenesCompra.css'
 
 const EMPTY_FILTERS = { search: '', status: '' }
@@ -350,19 +351,19 @@ export default function OrdenesCompra() {
   return (
     <div className="page-container animate-fade-in">
       <div className="page-header">
-        <div>
+        <div className="page-header-text">
           <h1 className="page-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+            <Icon name="package" size={20} />
             Control de Órdenes
           </h1>
           <p className="page-subtitle">Flujo lineal de adquisiciones y recepciones</p>
         </div>
-        <div className="page-actions" style={{ display: 'flex', gap: '8px' }}>
+        <div className="page-actions">
           {isEditing ? (
             <>
               <button className="btn btn-secondary" onClick={toggleEditMode}>Cancelar</button>
               <button className="btn btn-primary" onClick={handleSaveAll}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                <Icon name="check" size={16} />
                 Guardar Datos
               </button>
             </>
@@ -371,11 +372,11 @@ export default function OrdenesCompra() {
               {!isCapturista && (
                 <>
                   <button className="btn btn-secondary" onClick={toggleEditMode}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    <Icon name="edit" size={16} />
                     Editar Datos
                   </button>
                   <button className="btn btn-primary" onClick={() => setIsCreating(true)}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <Icon name="plus" size={16} />
                     Nueva Orden
                   </button>
                 </>
@@ -387,21 +388,19 @@ export default function OrdenesCompra() {
 
       {/* Filtros — disparan búsqueda con el botón Buscar o Enter */}
       <div className="card mb-6 p-4">
-        <div className="historial-filters">
-          <div className="filter-group" style={{ flex: 1, minWidth: '240px' }}>
-            <label className="filter-label">Buscar (No. Parte, No. PR o Descripción)</label>
+        <div className="filters">
+          <div className="filter-group" style={{ flex: 1, minWidth: '300px' }}>
+            <label className="filter-label" htmlFor="oc-search">Buscar (No. Parte, No. PR o Descripción)</label>
             <div className="search-with-btn">
-              <input
-                type="text"
-                className="form-control"
-                placeholder="S-14938NAT, PR-000 o descripción..."
+              <SearchField
+                id="oc-search"
+                placeholder="No. Parte, PR o descripción…"
                 value={filters.search}
-                onChange={e => handleFilterChange('search', e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') applyFilters() }}
-                style={{ width: '100%' }}
+                onChange={(v) => handleFilterChange('search', v)}
+                onSubmit={applyFilters}
               />
-              <button className="btn btn-primary" onClick={applyFilters} style={{ height: '30px', whiteSpace: 'nowrap' }}>
-                Buscar
+              <button className="btn btn-primary" onClick={applyFilters} style={{ height: '32px', whiteSpace: 'nowrap' }}>
+                <Icon name="search" size={15} /> Buscar
               </button>
             </div>
           </div>
@@ -537,7 +536,7 @@ export default function OrdenesCompra() {
                           }}
                         >
                           {STATUS_COLORS[orden.status]?.label}
-                          {nextStep && !isCapturista && <span className="advance-icon">→</span>}
+                          {nextStep && !isCapturista && <span className="advance-icon"><Icon name="arrowRight" size={13} /></span>}
                         </button>
 
                         {(orden.status === 'recibido' || orden.status === 'rem_recibido') && orden.recibido_por && (
@@ -605,7 +604,7 @@ export default function OrdenesCompra() {
                         {esCancelable && (
                           <button 
                             className="btn-icon" 
-                            title="Cancelar Orden (status → Cancelado)"
+                            title="Cancelar orden (pasará a Cancelado)"
                             onClick={() => setConfirmCancelId(orden.id)}
                           >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -635,7 +634,7 @@ export default function OrdenesCompra() {
 
       {/* Paginación */}
       {totalCount > 0 && (
-        <div className="historial-pagination">
+        <div className="pagination">
           <span className="pagination-info">
             Mostrando {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, totalCount)} de {totalCount} órdenes
           </span>
@@ -654,7 +653,7 @@ export default function OrdenesCompra() {
               disabled={page <= 1}
               onClick={() => setPage(p => Math.max(1, p - 1))}
             >
-              &laquo; Anterior
+              <Icon name="chevronLeft" size={15} /> Anterior
             </button>
             <span className="pagination-page">Pág. {page} de {totalPages}</span>
             <button
@@ -662,7 +661,7 @@ export default function OrdenesCompra() {
               disabled={page >= totalPages}
               onClick={() => setPage(p => p + 1)}
             >
-              Siguiente &raquo;
+              Siguiente <Icon name="chevronRight" size={15} />
             </button>
           </div>
         </div>
@@ -674,7 +673,7 @@ export default function OrdenesCompra() {
           <div className="modal-content modal-content--create" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">Nueva Requisición / Compra</h2>
-              <button className="btn-close" onClick={() => setIsCreating(false)}>&times;</button>
+              <button className="btn-close" onClick={() => setIsCreating(false)} aria-label="Cerrar" title="Cerrar"><Icon name="x" size={16} /></button>
             </div>
             <form className="modal-form modal-form--scrollable" onSubmit={handleCreateOc}>
               <div className="form-row">
@@ -801,7 +800,7 @@ export default function OrdenesCompra() {
           <div className="modal-content modal-content--step" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">Avance de Proceso</h2>
-              <button className="btn-close" onClick={() => setShowStepModal(false)}>&times;</button>
+              <button className="btn-close" onClick={() => setShowStepModal(false)} aria-label="Cerrar" title="Cerrar"><Icon name="x" size={16} /></button>
             </div>
             <div className="modal-body p-6">
                <div className="step-transition-visual">
@@ -809,7 +808,7 @@ export default function OrdenesCompra() {
                     <span className="step-label">Actual</span>
                     <span className="step-name">{STATUS_COLORS[activeStepOrden.status]?.label}</span>
                   </div>
-                  <div className="step-arrow">→</div>
+                  <div className="step-arrow"><Icon name="arrowRight" size={20} /></div>
                   <div className="step-box next">
                     <span className="step-label">Siguiente</span>
                     <span className="step-name">{STATUS_COLORS[getNextStatus(activeStepOrden)]?.label}</span>
@@ -872,7 +871,7 @@ export default function OrdenesCompra() {
           <div className="modal-content modal-content--details" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">Detalles de la Orden #{selectedOrden.id}</h2>
-              <button className="btn-close" onClick={() => setShowDetailsModal(false)}>&times;</button>
+              <button className="btn-close" onClick={() => setShowDetailsModal(false)} aria-label="Cerrar" title="Cerrar"><Icon name="x" size={16} /></button>
             </div>
             <div className="modal-body p-6">
               <div className="details-grid">
@@ -925,7 +924,7 @@ export default function OrdenesCompra() {
                   )}
                   {selectedOrden.tiempo_entrega_dias != null && (
                     <div className="detail-item">
-                      <label>Lead Time (PO → Recibido)</label>
+                      <label>Lead Time (PO a Recibido)</label>
                       <span>{selectedOrden.tiempo_entrega_dias} días</span>
                     </div>
                   )}
@@ -992,7 +991,7 @@ export default function OrdenesCompra() {
           <div className="modal-content modal-content--create" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">Editar Orden #{editOrden.id}</h2>
-              <button className="btn-close" onClick={closeEditModal}>&times;</button>
+              <button className="btn-close" onClick={closeEditModal} aria-label="Cerrar" title="Cerrar"><Icon name="x" size={16} /></button>
             </div>
             <form className="modal-form modal-form--scrollable" onSubmit={handleSaveEdit}>
               <div className="form-row">

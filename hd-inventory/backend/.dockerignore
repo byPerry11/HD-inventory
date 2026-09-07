@@ -4,6 +4,10 @@ __pycache__
 *.pyd
 *.log
 db.sqlite3
-.env
+**/.env*
 .git
 media
+staticfiles/
+.venv/
+*.xlsx
+.pytest_cache/

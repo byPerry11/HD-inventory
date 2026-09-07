@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../../api/client'
 import { useToast } from '../../context/ToastContext'
+import { Icon } from '../../components/ui'
 
 export default function Proveedores() {
   const [proveedores, setProveedores] = useState([])
@@ -24,17 +25,19 @@ export default function Proveedores() {
 
   return (
     <div className="proveedores-page">
-      <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
+      <header className="page-header">
+        <div className="page-header-text">
           <h1 className="page-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <Icon name="users" size={20} />
             Proveedores
           </h1>
           <p className="page-subtitle">Directorio de vendedores y contactos comerciales</p>
         </div>
-        <button className="btn btn-primary" onClick={() => notify.info('Módulo de creación próximamente')}>
-          + Nuevo Proveedor
-        </button>
+        <div className="page-actions">
+          <button className="btn btn-primary" onClick={() => notify.info('Módulo de creación próximamente')}>
+            <Icon name="plus" size={15} /> Nuevo proveedor
+          </button>
+        </div>
       </header>
 
       {loading ? (

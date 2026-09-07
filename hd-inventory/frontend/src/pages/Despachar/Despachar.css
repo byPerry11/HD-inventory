@@ -37,6 +37,13 @@
   background: var(--color-bg-secondary);
 }
 
+.despachar-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
 .despachar-search-wrapper {
   position: relative;
   display: flex;
@@ -373,6 +380,9 @@
   font-size: 0.7rem;
   color: var(--color-text-secondary);
   margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .cart-item-qty {

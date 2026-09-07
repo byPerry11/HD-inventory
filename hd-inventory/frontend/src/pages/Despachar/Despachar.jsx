@@ -3,6 +3,7 @@ import { usePersistentState } from '../../hooks/usePersistentState'
 import client from '../../api/client'
 import { cleanBadgeID } from '../../utils/formatters'
 import { useToast } from '../../context/ToastContext'
+import { Icon } from '../../components/ui'
 import './Despachar.css'
 import ValeModal from '../Vales/ValeModal'
 export default function Despachar() {
@@ -297,13 +298,13 @@ export default function Despachar() {
       {/* ─── Panel Izquierdo: Buscador y Catálogo ──────────────── */}
       <div className="despachar-catalog">
         <div className="despachar-header">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div className="despachar-header-row">
             <div className="title-section">
               <h2 style={{ margin: 0 }}>Modo Despacho</h2>
               <span style={{ color: 'var(--text-muted)' }}>Busca, escanea o selecciona</span>
             </div>
             <button className="btn btn-primary" onClick={() => setShowVale(true)}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2z"></path><line x1="13" y1="5" x2="13" y2="21"></line></svg>
+              <Icon name="ticket" size={16} />
               Crear Vale
             </button>
           </div>
@@ -328,7 +329,7 @@ export default function Despachar() {
 
           <div className="despachar-search-wrapper">
             <span className="despachar-search-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <Icon name="search" size={20} />
             </span>
             <input
               ref={searchInputRef}
@@ -363,7 +364,7 @@ export default function Despachar() {
                       <img src={m.image} alt={m.name} className="catalog-item-img" />
                     ) : (
                       <span className="catalog-item-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                        <Icon name="box" size={40} />
                       </span>
                     )}
                   </div>
@@ -371,7 +372,7 @@ export default function Despachar() {
                   <div className="catalog-item-name">{m.name}</div>
                   {m.ubicacion && (
                     <div className="catalog-item-location">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                      <Icon name="pin" size={11} />
                       {m.ubicacion}
                     </div>
                   )}
@@ -470,7 +471,7 @@ export default function Despachar() {
           {cart.length === 0 ? (
             <div className="cart-empty">
               <div className="cart-empty-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                <Icon name="cart" size={48} />
               </div>
               <p>El carrito está vacío</p>
               <p style={{ fontSize: '0.9rem' }}>Comienza a escanear productos</p>
@@ -482,25 +483,27 @@ export default function Despachar() {
                   <div className="cart-item-code">{item.material.code}</div>
                   <div className="cart-item-name" title={item.material.name}>{item.material.name}</div>
                   {item.material.ubicacion && (
-                    <div className="cart-item-location">📍 {item.material.ubicacion}</div>
+                    <div className="cart-item-location"><Icon name="pin" size={12} /> {item.material.ubicacion}</div>
                   )}
                 </div>
                 <div className="cart-item-qty">
-                  <button className="qty-btn" onClick={() => updateCartQty(item.material.id, -1)}>-</button>
+                  <button className="qty-btn" onClick={() => updateCartQty(item.material.id, -1)} aria-label="Reducir cantidad" title="Reducir cantidad"><Icon name="minus" size={14} /></button>
                   <input
                     type="number"
                     className="qty-input"
                     value={item.cantidad}
                     onChange={e => setExactCartQty(item.material.id, e.target.value)}
+                    aria-label="Cantidad"
                   />
-                  <button className="qty-btn" onClick={() => updateCartQty(item.material.id, 1)}>+</button>
+                  <button className="qty-btn" onClick={() => updateCartQty(item.material.id, 1)} aria-label="Aumentar cantidad" title="Aumentar cantidad"><Icon name="plus" size={14} /></button>
                 </div>
                 <button
                   className="cart-item-remove"
                   onClick={() => removeFromCart(item.material.id)}
                   title="Quitar"
+                  aria-label="Quitar del carrito"
                 >
-                  ✕
+                  <Icon name="x" size={15} />
                 </button>
               </div>
             ))

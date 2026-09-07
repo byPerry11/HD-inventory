@@ -13,10 +13,18 @@ export default function ChatMessage({ message, isOwn, onPin, onAction }) {
     file_name, 
     file_size, 
     is_pinned,
-    pending // Nuevo campo para Optimistic UI
+    pending, // Nuevo campo para Optimistic UI
+    failed // No se pudo enviar (sin WS y falló el fallback REST)
   } = message
 
   const finalUrl = file_url || attachment_url
+
+  const formatSize = (bytes) => {
+    if (!bytes && bytes !== 0) return 'Desconocido'
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
 
   const formattedTime = useMemo(() => {
     try {
@@ -41,7 +49,7 @@ export default function ChatMessage({ message, isOwn, onPin, onAction }) {
           <div className="msg-file-icon"><FileIcon /></div>
           <div className="msg-file-info">
             <div className="msg-file-name">{file_name || 'Archivo'}</div>
-            <div className="msg-file-size">{file_size ? (file_size / 1024).toFixed(1) + ' KB' : 'Desconocido'}</div>
+            <div className="msg-file-size">{formatSize(file_size)}</div>
           </div>
         </div>
       )
@@ -84,13 +92,25 @@ export default function ChatMessage({ message, isOwn, onPin, onAction }) {
           <span className="msg-time">
             {pending ? <SpinnerIcon size={12} /> : formattedTime}
           </span>
+          {failed && (
+            <span className="msg-failed">
+              No enviado.{' '}
+              <button
+                className="msg-retry-btn"
+                onClick={() => onAction('retry', message)}
+                title="Reintentar envío"
+              >
+                Reintentar
+              </button>
+            </span>
+          )}
         </div>
 
         <div className="msg-actions">
-           <button onClick={() => onPin(message)} title={is_pinned ? 'Desfijar' : 'Fijar'}>
+           <button type="button" className="icon-btn msg-action" onClick={() => onPin(message)} title={is_pinned ? 'Desfijar' : 'Fijar'} aria-label={is_pinned ? 'Desfijar mensaje' : 'Fijar mensaje'} aria-pressed={!!is_pinned}>
              <PinIcon size={14} filled={is_pinned} />
            </button>
-           <button onClick={() => onAction('delete', message)} title="Eliminar">
+           <button type="button" className="icon-btn msg-action" onClick={() => onAction('delete', message)} title="Eliminar" aria-label="Eliminar mensaje">
              <DeleteIcon size={14} />
            </button>
         </div>

@@ -1,14 +1,36 @@
-import { useState, useRef } from 'react'
-import { EmojiIcon, AttachIcon, SpinnerIcon, SendIcon } from './ChatIcons'
-import EmojiPicker from './EmojiPicker'
+import { useState, useRef, useEffect } from 'react'
+import { QuickIcon, AttachIcon, SpinnerIcon, SendIcon, CheckIcon, BoxIcon, TruckIcon, AlertIcon } from './ChatIcons'
 
-export default function ChatInput({ onSendMessage, onSendFile, onTyping }) {
+// Inserciones rápidas operativas del almacén: solo iconos SVG, sin emojis.
+const QUICK_INSERTS = [
+  { id: 'recibido', label: 'Recibido', text: 'Recibido, lo reviso ahora.', Icon: CheckIcon },
+  { id: 'stock', label: 'Revisar stock', text: 'Hay que revisar el stock de este material.', Icon: BoxIcon },
+  { id: 'camino', label: 'En camino', text: 'Va en camino al almacén.', Icon: TruckIcon },
+  { id: 'faltante', label: 'Faltante urgente', text: 'Urgente: faltante de material, priorizar.', Icon: AlertIcon },
+]
+
+export default function ChatInput({ onSendMessage, onSendFile, onTyping, uploadProgress = null }) {
   const [text, setText] = useState('')
-  const [showEmoji, setShowEmoji] = useState(false)
+  const [showQuick, setShowQuick] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
   const [uploading, setUploading] = useState(false)
   const typingTimeoutRef = useRef(null)
   const fileInputRef = useRef(null)
+  const quickRef = useRef(null)
+
+  useEffect(() => {
+    if (!showQuick) return
+    const onKey = (e) => { if (e.key === 'Escape') setShowQuick(false) }
+    const onClick = (e) => {
+      if (quickRef.current && !quickRef.current.contains(e.target)) setShowQuick(false)
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('mousedown', onClick)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('mousedown', onClick)
+    }
+  }, [showQuick])
 
   const handleSend = () => {
     if (text.trim()) {
@@ -27,14 +49,14 @@ export default function ChatInput({ onSendMessage, onSendFile, onTyping }) {
 
   const handleChange = (e) => {
     setText(e.target.value)
-    
+
     if (!isTyping) {
       setIsTyping(true)
       onTyping(true)
     }
 
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-    
+
     typingTimeoutRef.current = setTimeout(() => {
       stopTyping()
     }, 2000)
@@ -55,7 +77,7 @@ export default function ChatInput({ onSendMessage, onSendFile, onTyping }) {
     if (file) {
       setUploading(true)
       try {
-        await onSendFile(file)
+        await onSendFile(file, () => {})
       } finally {
         setUploading(false)
         e.target.value = '' // Limpiar input
@@ -63,46 +85,80 @@ export default function ChatInput({ onSendMessage, onSendFile, onTyping }) {
     }
   }
 
+  const insertQuick = (snippet) => {
+    setText(prev => (prev ? `${prev} ${snippet}` : snippet))
+    setShowQuick(false)
+  }
+
+  const canSend = text.trim().length > 0 && !uploading
+
   return (
     <div className={`chat-input-container ${uploading ? 'uploading' : ''}`}>
       <div className="chat-input-actions-left">
-        <button className="input-action-btn" onClick={() => setShowEmoji(!showEmoji)} title="Emojis">
-          <EmojiIcon />
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={() => setShowQuick(v => !v)}
+          title="Inserciones rápidas"
+          aria-label="Inserciones rápidas"
+          aria-expanded={showQuick}
+          aria-haspopup="menu"
+        >
+          <QuickIcon />
         </button>
-        <button className="input-action-btn" onClick={handleFileClick} title="Adjuntar" disabled={uploading}>
-          {uploading ? <SpinnerIcon size={18} /> : <AttachIcon />}
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={handleFileClick}
+          title="Adjuntar archivo"
+          aria-label="Adjuntar archivo"
+          disabled={uploading}
+        >
+          {uploading ? (uploadProgress != null ? <span className="upload-pct">{uploadProgress}%</span> : <SpinnerIcon size={18} />) : <AttachIcon />}
         </button>
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          style={{ display: 'none' }} 
+        <input
+          type="file"
+          ref={fileInputRef}
+          style={{ display: 'none' }}
           onChange={handleFileChange}
+          aria-hidden="true"
+          tabIndex={-1}
         />
       </div>
 
-      <textarea 
+      <textarea
         className="chat-textarea"
         placeholder="Escribe un mensaje..."
         value={text}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
         rows="1"
+        maxLength={2000}
+        aria-label="Escribe un mensaje"
       />
 
-      <button 
-        className={`send-btn ${text.trim() ? 'active' : ''}`} 
+      <button
+        type="button"
+        className={`send-btn ${canSend ? 'active' : ''}`}
         onClick={handleSend}
-        disabled={!text.trim()}
+        disabled={!canSend}
+        title="Enviar mensaje"
+        aria-label="Enviar mensaje"
       >
         <SendIcon />
       </button>
 
-      {showEmoji && (
-        <div className="emoji-picker-wrapper">
-          <EmojiPicker 
-            onSelect={(emoji) => setText(prev => prev + emoji)} 
-            onClose={() => setShowEmoji(false)} 
-          />
+      {showQuick && (
+        <div className="quick-insert-wrapper" ref={quickRef}>
+          <div className="quick-insert-panel" role="menu" aria-label="Inserciones rápidas">
+            <p className="quick-insert-title">Respuestas de almacén</p>
+            {QUICK_INSERTS.map(({ id, label, text: snippet, Icon }) => (
+              <button key={id} type="button" className="quick-insert-item" role="menuitem" onClick={() => insertQuick(snippet)}>
+                <span className="quick-insert-icon"><Icon size={18} /></span>
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

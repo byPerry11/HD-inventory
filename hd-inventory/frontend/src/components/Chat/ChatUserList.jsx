@@ -8,28 +8,32 @@ export default function ChatUserList({ onSelectUser, onBack, onCreateGroup }) {
   const [search, setSearch] = useState('')
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const response = await api.get('/auth/users/')
-        const data = Array.isArray(response.data) ? response.data : (response.data.results || [])
-        setUsers(data)
-      } catch (err) {
-        console.error('Error fetching users', err)
-      } finally {
-        setLoading(false)
+    // Búsqueda server-side (?search=) con debounce: el endpoint pagina,
+    // filtrar solo la página local perdería usuarios.
+    const t = setTimeout(() => {
+      const fetchUsers = async () => {
+        setLoading(true)
+        try {
+          const response = await api.get('/auth/users/', { params: search ? { search } : {} })
+          const data = Array.isArray(response.data) ? response.data : (response.data.results || [])
+          setUsers(data)
+        } catch (err) {
+          console.error('Error fetching users', err)
+        } finally {
+          setLoading(false)
+        }
       }
-    }
-    fetchUsers()
-  }, [])
+      fetchUsers()
+    }, 300)
+    return () => clearTimeout(t)
+  }, [search])
 
-  const filteredUsers = users.filter(u => 
-    (u.username + u.first_name + u.last_name).toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredUsers = users
 
   return (
     <div className="chat-user-list">
       <div className="chat-view-header">
-        <button className="back-btn" onClick={onBack}><BackIcon /></button>
+        <button type="button" className="icon-btn back-btn" onClick={onBack} title="Volver" aria-label="Volver"><BackIcon /></button>
         <h3>Nuevo Mensaje</h3>
       </div>
       

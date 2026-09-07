@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import api from '../../api/client'
 import { cleanBadgeID } from '../../utils/formatters'
 import { useToast } from '../../context/ToastContext'
+import { Icon } from '../../components/ui'
 
 const EMPTY_ITEM = { material: '', search: '', selected: null, cantidad: '1', costo: '0' }
 
@@ -167,10 +168,10 @@ export default function ValeModal({ open, onClose, preselectedMaterial }) {
       <div className="modal-content modal-content--wide" onClick={e => e.stopPropagation()}>
         <header className="modal-header">
           <h2 className="flex items-center gap-2" style={{ fontSize: '1.25rem', fontWeight: 600 }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2z"></path><line x1="13" y1="5" x2="13" y2="21"></line></svg>
+            <Icon name="file" size={20} />
             Crear Vale de Consumo
           </h2>
-          <button className="modal-close" onClick={() => onClose(false)}>×</button>
+          <button className="modal-close" onClick={() => onClose(false)} aria-label="Cerrar" title="Cerrar"><Icon name="x" size={18} /></button>
         </header>
 
         <form onSubmit={handleSubmit} className="modal-body">
@@ -213,7 +214,7 @@ export default function ValeModal({ open, onClose, preselectedMaterial }) {
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
               <label className="form-label" style={{ margin: 0 }}>Artículos</label>
-              <button type="button" className="btn btn-sm btn-primary" onClick={addItem}>+ Agregar otro</button>
+              <button type="button" className="btn btn-sm btn-primary" onClick={addItem}><Icon name="plus" size={14} /> Agregar otro</button>
             </div>
 
             {items.map((item, idx) => (

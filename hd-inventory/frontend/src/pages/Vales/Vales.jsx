@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import ValeModal from './ValeModal'
 import ConfirmModal from '../../components/ConfirmModal'
+import { Icon, SearchField } from '../../components/ui'
 import './Vales.css'
 
 const PAGE_SIZES = [25, 50, 100]
@@ -141,31 +142,30 @@ export default function Vales() {
   return (
     <div>
       <div className="page-header">
-        <div className="vales-toolbar">
-          <h1 className="page-title flex items-center gap-2" style={{ margin: 0 }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        <div className="page-header-text">
+          <h1 className="page-title">
+            <Icon name="file" size={20} />
             Vales de Consumo
           </h1>
+          <p className="page-subtitle">Historial de vales registrados</p>
+        </div>
+        <div className="page-actions">
           <button className="btn btn-primary" onClick={() => setShowValeModal(true)}>
-            + Nuevo Vale
+            <Icon name="plus" size={15} /> Nuevo vale
           </button>
         </div>
-        <p className="page-subtitle">Historial de vales registrados</p>
       </div>
 
       {/* Filters */}
       <div className="card" style={{ marginBottom: 'var(--space-3)' }}>
-        <div className="vales-filters">
-          <div className="filter-group">
-            <label className="filter-label">Buscar</label>
-            <input
-              className="form-control"
-              placeholder="Recibo, empleado, material..."
-              value={filters.search}
-              onChange={e => handleFilterChange('search', e.target.value)}
-              style={{ width: '220px' }}
-            />
-          </div>
+        <div className="filters">
+          <SearchField
+            label="Buscar"
+            placeholder="Recibo, empleado, material..."
+            value={filters.search}
+            onChange={(v) => handleFilterChange('search', v)}
+            width="220px"
+          />
           <div className="filter-group">
             <label className="filter-label">Desde</label>
             <input
@@ -190,7 +190,7 @@ export default function Vales() {
             </button>
           </div>
           <div className="filter-actions" style={{ marginLeft: 'auto' }}>
-            <span className="pagination-count-badge">{totalCount} vales</span>
+            <span className="pagination-count">{totalCount} vales</span>
           </div>
         </div>
       </div>
@@ -465,22 +465,21 @@ export default function Vales() {
 
       {/* Pagination */}
       {totalCount > 0 && (
-        <div className="vales-pagination">
-          <div className="pagination-info">
+        <div className="pagination">
+          <span className="pagination-info">
             Página {page} de {totalPages} ({totalCount} vales)
-          </div>
+          </span>
           <div className="pagination-controls">
             <select
-              className="form-control"
+              className="form-control pagination-page-size"
               value={pageSize}
               onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}
-              style={{ width: 'auto' }}
             >
               {PAGE_SIZES.map(ps => <option key={ps} value={ps}>{ps} por página</option>)}
             </select>
-            <button className="btn btn-sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Anterior</button>
-            <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{page}</span>
-            <button className="btn btn-sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Siguiente</button>
+            <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}><Icon name="chevronLeft" size={15} /> Anterior</button>
+            <span className="pagination-page">{page}</span>
+            <button className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Siguiente <Icon name="chevronRight" size={15} /></button>
           </div>
         </div>
       )}

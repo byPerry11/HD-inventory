@@ -1,13 +1,32 @@
 from rest_framework import serializers
 from .models import Conversation, Message
-from apps.accounts.serializers import UserSerializer
+
+
+def _relative_url(file_field):
+    """URL relativa same-origin (el Host del proxy interno no es resoluble)."""
+    try:
+        return file_field.url if file_field else None
+    except Exception:
+        return None
+
+
+def _user_compact(user):
+    return {
+        'id': user.id,
+        'username': user.username,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'avatar': _relative_url(getattr(user, 'avatar', None)),
+    }
+
 
 class MessageSerializer(serializers.ModelSerializer):
     sender_name = serializers.ReadOnlyField(source='sender.username')
-    sender_avatar = serializers.ImageField(source='sender.avatar', read_only=True)
+    sender_avatar = serializers.SerializerMethodField()
     content = serializers.CharField() # Property que cifra/descifra
+    attachment = serializers.SerializerMethodField()
     attachment_url = serializers.SerializerMethodField()
-    read_by_details = UserSerializer(source='read_by', many=True, read_only=True)
+    read_by_details = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
@@ -18,13 +37,25 @@ class MessageSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'sender', 'timestamp', 'read_by']
 
+    def get_sender_avatar(self, obj):
+        return _relative_url(getattr(obj.sender, 'avatar', None))
+
+    def get_attachment(self, obj):
+        return _relative_url(getattr(obj, 'attachment', None))
+
     def get_attachment_url(self, obj):
-        if obj.attachment:
-            return obj.attachment.url
-        return None
+        return _relative_url(getattr(obj, 'attachment', None))
+
+    def get_read_by_details(self, obj):
+        return [_user_compact(u) for u in obj.read_by.all()]
+
+    def validate_content(self, value):
+        if value is not None and len(value) > 2000:
+            raise serializers.ValidationError('Máximo 2000 caracteres.')
+        return value
 
 class ConversationSerializer(serializers.ModelSerializer):
-    participants_details = UserSerializer(source='participants', many=True, read_only=True)
+    participants_details = serializers.SerializerMethodField()
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
     display_name = serializers.SerializerMethodField()
@@ -39,14 +70,18 @@ class ConversationSerializer(serializers.ModelSerializer):
         ]
 
     def get_last_message(self, obj):
-        last = obj.messages.all().last()
+        last = obj.messages.select_related('sender').order_by('-timestamp').first()
         if last:
-            return MessageSerializer(last).data
+            return MessageSerializer(last, context=self.context).data
         return None
 
+    def get_participants_details(self, obj):
+        return [_user_compact(u) for u in obj.participants.all()]
+
     def get_unread_count(self, obj):
-        user = self.context.get('request').user
-        if user.is_anonymous:
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if not user or getattr(user, 'is_anonymous', True):
             return 0
         return obj.messages.exclude(read_by=user).count()
 

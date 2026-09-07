@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../../api/client'
 import { useToast } from '../../context/ToastContext'
+import { Icon } from '../../components/ui'
 
 // Inline SVG Icons
 const IconCheckSquare = ({ size = 20 }) => (
@@ -112,7 +113,7 @@ export default function ReportModal({ onClose }) {
       <div className="modal-content" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Generar Reporte de Inventario</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <button className="modal-close" onClick={onClose} aria-label="Cerrar" title="Cerrar"><Icon name="x" size={18} /></button>
         </div>
         
         <div className="modal-body">

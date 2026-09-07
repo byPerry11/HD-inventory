@@ -12,9 +12,10 @@ def _get_fernet():
         key = os.getenv('CHAT_ENCRYPTION_KEY')
         if not key:
             if settings.DEBUG:
-                # Clave fija solo para desarrollo si no está definida
-                key = Fernet.generate_key().decode()
-                warnings.warn("CHAT_ENCRYPTION_KEY no configurada en .env. Usando clave temporal (los mensajes se perderán al reiniciar).")
+                # Clave fija de desarrollo: todos los workers/procesos comparten
+                # la misma para no perder mensajes al reiniciar. NUNCA en prod.
+                key = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
+                warnings.warn("CHAT_ENCRYPTION_KEY no configurada. Usando clave fija de desarrollo.")
             else:
                 raise ImproperlyConfigured("CHAT_ENCRYPTION_KEY es requerida en producción para el chat cifrado.")
         

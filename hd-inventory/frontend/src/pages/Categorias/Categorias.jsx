@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../../api/client'
 import { useToast } from '../../context/ToastContext'
+import { Icon } from '../../components/ui'
 
 export default function Categorias() {
   const [categorias, setCategorias] = useState([])
@@ -24,17 +25,19 @@ export default function Categorias() {
 
   return (
     <div className="categorias-page">
-      <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
+      <header className="page-header">
+        <div className="page-header-text">
           <h1 className="page-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <Icon name="folder" size={20} />
             Categorías
           </h1>
           <p className="page-subtitle">Organización de materiales por familias</p>
         </div>
-        <button className="btn btn-primary" onClick={() => notify.info('Módulo de creación próximamente')}>
-          + Nueva Categoría
-        </button>
+        <div className="page-actions">
+          <button className="btn btn-primary" onClick={() => notify.info('Módulo de creación próximamente')}>
+            <Icon name="plus" size={15} /> Nueva categoría
+          </button>
+        </div>
       </header>
 
       {loading ? (
