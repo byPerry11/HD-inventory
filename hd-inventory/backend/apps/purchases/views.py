@@ -95,16 +95,16 @@ class OrdenCompraViewSet(viewsets.ModelViewSet):
         instance.refresh_from_db()
         response_data = serializer.data
 
-        # Advertencia si se creó un material inactivo automáticamente
-        if getattr(instance, '_material_creado_inactivo', False):
+        # Advertencia si se creó un material automáticamente
+        if getattr(instance, '_material_creado_automaticamente', False):
             response_data = dict(serializer.data)
             response_data['warnings'] = [
                 {
-                    'code':    'material_creado_inactivo',
+                    'code':    'material_creado_automaticamente',
                     'message': (
                         f'El material "{instance.no_parte}" no existía en el inventario. '
-                        f'Se creó automáticamente en estado INACTIVO. '
-                        f'Ve a Materiales para completar su información y activarlo.'
+                        f'Se creó automáticamente en estado ACTIVO. '
+                        f'Ve a Materiales para completar su información.'
                     ),
                 }
             ]
@@ -195,10 +195,10 @@ class OrdenCompraViewSet(viewsets.ModelViewSet):
         # Refrescar para advertencias de stock
         instance.refresh_from_db()
         resp_data = serializer.data
-        if getattr(instance, '_material_creado_inactivo', False):
+        if getattr(instance, '_material_creado_automaticamente', False):
             resp_data['warnings'] = [{
-                'code': 'material_creado_inactivo',
-                'message': f'Material "{instance.no_parte}" creado como inactivo.'
+                'code': 'material_creado_automaticamente',
+                'message': f'Material "{instance.no_parte}" creado automáticamente en estado activo.'
             }]
 
         return Response(resp_data)
