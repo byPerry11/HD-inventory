@@ -36,13 +36,15 @@ const PATHS = {
   arrowRight: ['M5 12h14', 'M12 5l7 7-7 7'],
   arrowUp: ['M12 19V5', 'M5 12l7-7 7 7'],
   arrowDown: ['M12 5v14', 'M19 12l-7 7-7-7'],
+  triangleUp: ['M12 4l9 16H3z'],
+  triangleDown: ['M12 20L3 4h18z'],
   inbox: ['M22 12h-6l-2 3h-4l-2-3H2', 'M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z'],
   circle: ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z'],
   checkCircle: ['M22 11.08V12a10 10 0 1 1-5.93-9.14', 'M22 4L12 14.01l-3-3'],
   xCircle: ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z', 'M15 9l-6 6', 'M9 9l6 6'],
 }
 
-export default function Icon({ name, size = 18, ...props }) {
+export default function Icon({ name, size = 18, fill = 'none', ...props }) {
   const paths = PATHS[name] || PATHS.info
   return (
     <svg
@@ -50,7 +52,7 @@ export default function Icon({ name, size = 18, ...props }) {
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="none"
+      fill={fill}
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"

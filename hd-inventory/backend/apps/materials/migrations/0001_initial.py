@@ -29,10 +29,15 @@ class Migration(migrations.Migration):
             name='Material',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+# Squash de rescate 2026-09-07: barcode/image/ubicacion consolidados aquí
+# (equivalen a 0002..0004 ya aplicadas en prod). Ver _migration_archive_20260907/.
                 ('code', models.CharField(help_text='Código único del material (parte number o código interno)', max_length=50, unique=True, verbose_name='Código')),
+                ('barcode', models.CharField(blank=True, help_text='Código de barras para escaneo rápido (EAN, UPC, code128)', max_length=50, null=True, unique=True, verbose_name='Código de Barras')),
                 ('name', models.CharField(max_length=200, verbose_name='Nombre')),
+                ('image', models.ImageField(blank=True, null=True, upload_to='materials/', verbose_name='Imagen del producto')),
                 ('unit', models.CharField(choices=[('pza', 'Pieza'), ('kg', 'Kilogramo'), ('lt', 'Litro'), ('mt', 'Metro'), ('caja', 'Caja'), ('rollo', 'Rollo'), ('bolsa', 'Bolsa'), ('par', 'Par'), ('juego', 'Juego'), ('otro', 'Otro')], default='pza', max_length=20, verbose_name='Unidad de medida')),
                 ('descripcion', models.TextField(blank=True, verbose_name='Descripción')),
+                ('ubicacion', models.CharField(blank=True, help_text='Posición o referencia en estante (ej. Locker 13-B, LOKER-amarillo)', max_length=100, verbose_name='Ubicación en almacén')),
                 ('stock_actual', models.IntegerField(default=0, verbose_name='Stock Actual')),
                 ('stock_minimo', models.IntegerField(default=10, help_text='Por debajo de este nivel el estado cambia a "Ordenar"', verbose_name='Stock Mínimo')),
                 ('stock_critico', models.IntegerField(default=5, help_text='Por debajo de este nivel el estado cambia a "Urge"', verbose_name='Stock Crítico')),

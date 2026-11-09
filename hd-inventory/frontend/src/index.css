@@ -31,6 +31,10 @@
   --color-urge:          #f85149;
   --color-urge-bg:       rgba(248, 81, 73, 0.12);
 
+  /* Flujo de materiales */
+  --color-flow-out:      #f85149;
+  --color-flow-in:       #3fb950;
+
   /* UI */
   --color-success:       #3fb950;
   --color-warning:       #d29922;
@@ -113,6 +117,9 @@
   --color-text-primary:  #1f2328;
   --color-text-secondary:#57606a;
   --color-text-muted:    #6e7781;
+
+  --color-flow-out:      #cf222e;
+  --color-flow-in:       #1a7f37;
 
   --shadow-sm:  0 1px 2px rgba(31,35,40,0.075);
   --shadow-md:  0 3px 6px rgba(140,149,159,0.15);

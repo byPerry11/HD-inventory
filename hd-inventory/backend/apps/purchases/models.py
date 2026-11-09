@@ -7,10 +7,12 @@ Flujo de estados:
 
 Al cambiar a 'recibido':
   - Busca el material por FK o por no_parte (code).
-  - Si existe: suma cantidad al stock_actual y crea una Entrada de trazabilidad.
-  - Si NO existe: crea el material en estado INACTIVO y establece stock_actual = cantidad.
-    La instancia guarda self._material_creado_inactivo = True para que el ViewSet
-    pueda incluir una advertencia en la respuesta.
+  - Si existe: lo activa si estaba inactivo, suma cantidad al stock_actual y
+    crea una Entrada de trazabilidad.
+  - Si NO existe: crea el material en estado ACTIVO y establece
+    stock_actual = cantidad.
+    La instancia guarda self._material_creado_automaticamente = True para que
+    el ViewSet pueda incluir una advertencia en la respuesta.
 """
 from django.db import models
 from django.db.models.functions import Lower
@@ -185,7 +187,7 @@ class OrdenCompra(models.Model):
     actualizado_en  = models.DateTimeField(auto_now=True)
 
     # ─── Atributo transient (no se persiste) ──────────────────
-    _material_creado_inactivo: bool = False
+    _material_creado_automaticamente: bool = False
 
     class Meta:
         verbose_name        = 'Orden de Compra'
@@ -293,7 +295,7 @@ class OrdenCompra(models.Model):
             is_received = self.status in ('recibido', 'rem_recibido')
 
             if is_received and not was_received:
-                self._material_creado_inactivo = self._actualizar_stock()
+                self._material_creado_automaticamente = self._actualizar_stock()
             elif was_received and not is_received:
                 self._revertir_stock()
 
@@ -324,15 +326,16 @@ class OrdenCompra(models.Model):
     def _actualizar_stock(self) -> bool:
         """
         Suma la cantidad al stock del material vinculado.
-        Si no existe, crea el material en estado INACTIVO.
+        Si no existe, crea el material en estado ACTIVO.
+        Si existe pero está inactivo, lo reactiva para que sea visible.
         Crea siempre un registro Entrada para trazabilidad.
 
-        Retorna True si se creó un material nuevo (inactivo).
+        Retorna True si se creó un material nuevo.
         """
         from apps.materials.models import Material
         from apps.inventory.models  import Entrada
 
-        creado_inactivo = False
+        creado_automaticamente = False
         material = self.material
 
         if material is None:
@@ -340,22 +343,26 @@ class OrdenCompra(models.Model):
             material = Material.objects.filter(code=self.no_parte).first()
 
             if material is None:
-                # Crear material INACTIVO con datos mínimos
+                # Crear material ACTIVO con datos mínimos
                 material = Material.objects.create(
                     code=self.no_parte,
                     name=self.descripcion,
-                    activo=False,          # ← INACTIVO: falta información
+                    activo=True,
                     stock_actual=0,
                     stock_minimo=10,
                     stock_critico=5,
                     unit='pza',
                     descripcion=f'Creado automáticamente desde OC #{self.pk}. Completar información.',
                 )
-                creado_inactivo = True
+                creado_automaticamente = True
 
             # Persistir el vínculo sin disparar save() completo otra vez
             OrdenCompra.objects.filter(pk=self.pk).update(material=material)
             self.material = material
+
+        if not material.activo:
+            material.activo = True
+            material.save(update_fields=['activo', 'actualizado_en'])
 
         # Crear Entrada de trazabilidad
         Entrada.objects.create(
@@ -369,4 +376,4 @@ class OrdenCompra(models.Model):
             ),
         )
 
-        return creado_inactivo
+        return creado_automaticamente

@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('materials', '0003_add_ubicacion_to_material'),
+        ('materials', '0004_remove_material_price_unit'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

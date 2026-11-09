@@ -19,6 +19,144 @@ const IconFileText = () => <Icon name="file" size={18} />
 const IconChevronLeft = () => <Icon name="chevronLeft" size={18} />
 const IconChevronRight = () => <Icon name="chevronRight" size={18} />
 
+const PERIODOS_FLUJO = [
+  { key: '24h', label: '24 h', title: 'Últimas 24 horas' },
+  { key: '3d', label: '3 d', title: 'Últimos 3 días' },
+  { key: '7d', label: '7 d', title: 'Últimos 7 días' },
+  { key: '15d', label: '15 d', title: 'Últimos 15 días' },
+]
+
+const formatUnidades = (value) => (value ?? 0).toLocaleString('es-MX')
+
+/* ─── Flujo de materiales — Top despachados ─────────────────── */
+function FlujoMaterialesCard() {
+  const [periodos, setPeriodos] = useState([])
+  const [periodoKey, setPeriodoKey] = useState('7d')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(false)
+    try {
+      const { data } = await api.get('/analytics/flujo-materiales/?limite=10')
+      setPeriodos(data.periodos || [])
+    } catch {
+      setError(true)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const periodo = periodos.find(p => p.key === periodoKey) || periodos[2] || periodos[0]
+  const filas = periodo?.data || []
+  const activo = PERIODOS_FLUJO.find(p => p.key === periodoKey) || PERIODOS_FLUJO[2]
+
+  return (
+    <div className="card flujo-card">
+      <div className="flujo-head">
+        <div className="flujo-heading">
+          <span className="flujo-heading-icon"><IconAward /></span>
+          <div>
+            <h2 className="flujo-title">Flujo de materiales</h2>
+            <p className="flujo-subtitle">Los más despachados · {activo.title.toLowerCase()}</p>
+          </div>
+        </div>
+        <div className="flujo-tabs" role="group" aria-label="Periodo del flujo de materiales">
+          {PERIODOS_FLUJO.map(p => (
+            <button
+              key={p.key}
+              type="button"
+              className={`flujo-tab${p.key === periodoKey ? ' is-active' : ''}`}
+              aria-pressed={p.key === periodoKey}
+              title={p.title}
+              onClick={() => setPeriodoKey(p.key)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flujo-summary" aria-live="polite">
+        <span className="flujo-legend flujo-legend--out">
+          <Icon name="triangleUp" size={11} fill="currentColor" />
+          Salidas
+          <strong>{loading ? '—' : formatUnidades(periodo?.salidas)}</strong>
+        </span>
+        <span className="flujo-legend flujo-legend--in">
+          <Icon name="triangleDown" size={11} fill="currentColor" />
+          Entradas
+          <strong>{loading ? '—' : formatUnidades(periodo?.entradas)}</strong>
+        </span>
+        {!loading && !error && periodo && (
+          <span className="flujo-count">{periodo.data.length} materiales</span>
+        )}
+      </div>
+
+      {error ? (
+        <div className="flujo-state">
+          <Icon name="alert" size={22} />
+          <p>No se pudo cargar el flujo de materiales.</p>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={load}>Reintentar</button>
+        </div>
+      ) : loading ? (
+        <div className="flujo-list flujo-list--loading" aria-busy="true" aria-label="Cargando flujo de materiales">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div className="flujo-row flujo-row--skeleton" key={i}>
+              <span className="flujo-skeleton flujo-skeleton--rank" />
+              <span className="flujo-skeleton flujo-skeleton--name" />
+              <span className="flujo-skeleton flujo-skeleton--qty" />
+              <span className="flujo-skeleton flujo-skeleton--qty" />
+            </div>
+          ))}
+        </div>
+      ) : filas.length === 0 ? (
+        <div className="flujo-state">
+          <Icon name="package" size={24} />
+          <p>Sin movimientos en {activo.title.toLowerCase()}.</p>
+        </div>
+      ) : (
+        <div className="flujo-list" role="list" aria-label={`Materiales más despachados en ${activo.title.toLowerCase()}`}>
+          <div className="flujo-columns" aria-hidden="true">
+            <span className="flujo-rank">#</span>
+            <span>Material</span>
+            <span className="flujo-qty flujo-qty--out">Salidas</span>
+            <span className="flujo-qty flujo-qty--in">Entradas</span>
+          </div>
+          {filas.map((m, idx) => (
+            <div className="flujo-row" role="listitem" key={m.material_id}>
+              <span className={`flujo-rank${idx < 3 ? ' is-top' : ''}`}>
+                {String(idx + 1).padStart(2, '0')}
+              </span>
+              <div className="flujo-material">
+                <span className="flujo-name" title={m.name}>{m.name}</span>
+                <span className="flujo-code">{m.code} · {m.unit}</span>
+              </div>
+              <span
+                className="flujo-qty flujo-qty--out"
+                title={`${formatUnidades(m.salidas)} unidades en ${m.movimientos_salida} salida${m.movimientos_salida === 1 ? '' : 's'}`}
+              >
+                <Icon name="triangleUp" size={11} fill="currentColor" />
+                {formatUnidades(m.salidas)}
+              </span>
+              <span
+                className={`flujo-qty flujo-qty--in${m.entradas === 0 ? ' is-zero' : ''}`}
+                title={`${formatUnidades(m.entradas)} unidades en ${m.movimientos_entrada} entrada${m.movimientos_entrada === 1 ? '' : 's'}`}
+              >
+                <Icon name="triangleDown" size={11} fill="currentColor" />
+                {formatUnidades(m.entradas)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ─── Gallery Scroll Component ───────────────────────────────── */
 function AlertaGallery({ items, type }) {
   const scrollRef = useRef(null)
@@ -83,7 +221,6 @@ export default function Dashboard() {
   const [alertas, setAlertas]         = useState({ urge: [], ordenar: [] })
   const [sugerencias, setSugerencias] = useState([])
   const [consumo, setConsumo]         = useState([])
-  const [topSalidas, setTopSalidas]   = useState([])
   const [recientes, setRecientes]     = useState({ entradas: [], salidas: [], vales: [] })
   const [loading, setLoading]         = useState(true)
   const [selectedVale, setSelectedVale] = useState(null)
@@ -92,19 +229,17 @@ export default function Dashboard() {
   const loadAll = useCallback(async (dias) => {
     setLoading(true)
     try {
-      const [res, ale, sug, con, top, rec] = await Promise.all([
+      const [res, ale, sug, con, rec] = await Promise.all([
         api.get('/analytics/resumen/'),
         api.get('/analytics/alertas/'),
         api.get('/analytics/sugerencias-compra/'),
         api.get(`/analytics/consumo-por-linea/?dias=${dias}`),
-        api.get(`/analytics/top-salidas/?dias=${dias}`),
         api.get('/analytics/movimientos-recientes/'),
       ])
       setResumen(res.data)
       setAlertas(ale.data)
       setSugerencias(sug.data || [])
       setConsumo(con.data.data || [])
-      setTopSalidas(top.data.data || [])
       setRecientes(rec.data)
     } catch { /* silenciar */ } finally { setLoading(false) }
   }, [])
@@ -333,38 +468,9 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ─── Top Salidas + Movimientos Recientes ────── */}
+      {/* ─── Flujo de Materiales + Vales Recientes ────── */}
       <div className="dashboard-bottom">
-        {/* Top materiales más despachados */}
-        <div className="card">
-          <h2 className="dashboard-section-title"><IconAward /> Top Materiales Despachados ({periodo} días)</h2>
-          <div className="table-container">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Código</th>
-                  <th>Material</th>
-                  <th className="text-right">Movimientos</th>
-                  <th className="text-right">Unidades</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topSalidas.length === 0 ? (
-                  <tr><td colSpan={5} style={{ textAlign:'center', padding:32, color:'var(--color-text-muted)' }}>Sin datos en los últimos {periodo} días</td></tr>
-                ) : topSalidas.map((item, idx) => (
-                  <tr key={item.material__id}>
-                    <td className="text-muted">{idx + 1}</td>
-                    <td><span className="font-mono">{item.material__code}</span></td>
-                    <td>{item.material__name}</td>
-                    <td className="text-right">{item.total_movimientos}</td>
-                    <td className="text-right" style={{ fontWeight: 600 }}>{item.total_unidades}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <FlujoMaterialesCard />
 
         {/* Vales de Consumo (Recientes) */}
         <div className="card">

@@ -1,8 +1,10 @@
 from django.test import TestCase
 from django.utils import timezone
 from django.contrib.auth import get_user_model
+from rest_framework.test import APIClient
 from apps.purchases.models import OrdenCompra, Proveedor
 from apps.materials.models import Material
+from apps.inventory.models import Entrada
 
 User = get_user_model()
 
@@ -127,6 +129,122 @@ class OrdenCompraTest(TestCase):
         
         # Debe calcular 5 días
         self.assertEqual(oc.tiempo_entrega_dias, 5)
+
+    def test_recibir_crea_material_activo_y_registra_entrada(self):
+        """Al recibir una OC con un No. parte nuevo se crea un material ACTIVO con stock."""
+        oc = OrdenCompra.objects.create(
+            no_parte='NEW-PART-001',
+            descripcion='Sensor nuevo',
+            cantidad=7,
+            costo_unitario=15.0,
+            moneda='MXN',
+            po_number='PO-2026-100',
+            creado_por=self.user,
+        )
+        self.assertIsNone(oc.material)
+
+        oc.status = 'recibido'
+        oc.recibido_por = 'Almacenista Test'
+        oc.save()
+
+        material = Material.objects.get(code='NEW-PART-001')
+        self.assertTrue(material.activo)
+        self.assertEqual(material.stock_actual, 7)
+        self.assertEqual(material.name, 'Sensor nuevo')
+        self.assertTrue(oc._material_creado_automaticamente)
+
+        oc.refresh_from_db()
+        self.assertEqual(oc.material_id, material.id)
+        self.assertEqual(
+            Entrada.objects.filter(
+                material=material,
+                cantidad=7,
+                numero_orden='PO-2026-100',
+            ).count(),
+            1,
+        )
+
+    def test_recibir_reactiva_material_inactivo_existente(self):
+        """Si el material ya existe pero está inactivo, al recibir se reactiva y suma stock."""
+        material = Material.objects.create(
+            code='MAT-INACTIVO-01',
+            name='Material inactivo',
+            activo=False,
+            stock_actual=0,
+        )
+        oc = OrdenCompra.objects.create(
+            no_parte='MAT-INACTIVO-01',
+            descripcion='Material inactivo',
+            cantidad=3,
+            costo_unitario=5.0,
+            moneda='MXN',
+            material=material,
+            creado_por=self.user,
+        )
+
+        oc.status = 'recibido'
+        oc.recibido_por = 'Almacenista Test'
+        oc.save()
+
+        material.refresh_from_db()
+        self.assertTrue(material.activo)
+        self.assertEqual(material.stock_actual, 3)
+        self.assertFalse(oc._material_creado_automaticamente)
+
+    def test_advance_step_a_recibido_registra_material_activo(self):
+        """El endpoint usado por la UI al recibir deja el material activo y con stock."""
+        oc = OrdenCompra.objects.create(
+            no_parte='API-PART-001',
+            descripcion='Material desde API',
+            cantidad=4,
+            costo_unitario=8.0,
+            moneda='MXN',
+            status='ordenado',
+            creado_por=self.user,
+        )
+        client = APIClient()
+        client.force_authenticate(user=self.user)
+
+        response = client.post(
+            f'/api/purchases/ordenes/{oc.id}/advance-step/',
+            {'recibido_por': 'Almacenista API'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        material = Material.objects.get(code='API-PART-001')
+        self.assertTrue(material.activo)
+        self.assertEqual(material.stock_actual, 4)
+        oc.refresh_from_db()
+        self.assertEqual(oc.status, 'recibido')
+        self.assertEqual(oc.material_id, material.id)
+        self.assertEqual(oc.recibido_por, 'Almacenista API')
+
+    def test_recibir_material_existente_no_duplica_stock_al_volver_a_guardar(self):
+        """Guardar de nuevo una OC ya recibida no debe crear otra entrada ni sumar stock."""
+        oc = OrdenCompra.objects.create(
+            no_parte='MAT-TEST-01',
+            descripcion='Material de Prueba',
+            cantidad=5,
+            costo_unitario=10.0,
+            moneda='MXN',
+            material=self.material,
+            creado_por=self.user,
+        )
+        oc.status = 'recibido'
+        oc.recibido_por = 'Almacenista Test'
+        oc.save()
+
+        self.material.refresh_from_db()
+        self.assertEqual(self.material.stock_actual, 15)
+
+        oc.save()
+        self.material.refresh_from_db()
+        self.assertEqual(self.material.stock_actual, 15)
+        self.assertEqual(
+            Entrada.objects.filter(material=self.material, cantidad=5).count(),
+            1,
+        )
 
     def assertNilDates(self, instance, field_names):
         for name in field_names:

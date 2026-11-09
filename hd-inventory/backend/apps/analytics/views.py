@@ -230,6 +230,119 @@ class TopSalidasView(APIView):
         return Response({'dias': dias, 'data': data})
 
 
+PERIODOS_FLUJO = (
+    ('24h', '24 h', timedelta(hours=24)),
+    ('3d', '3 días', timedelta(days=3)),
+    ('7d', '7 días', timedelta(days=7)),
+    ('15d', '15 días', timedelta(days=15)),
+)
+
+
+def _flujo_periodo(desde, limite):
+    """
+    Top de materiales por unidades despachadas en la ventana dada,
+    acompañado de las unidades que entraron en esa misma ventana.
+
+    Las salidas incluyen ValeItems de vales sin Salida asociada para no
+    duplicar los vales que ya generaron una salida.
+    """
+    salidas = list(
+        Salida.objects
+        .filter(fecha__gte=desde)
+        .values('material_id', 'material__code', 'material__name', 'material__unit')
+        .annotate(
+            total_salidas=Sum('cantidad'),
+            movimientos_salida=Count('id'),
+        )
+    )
+    vales = list(
+        ValeItem.objects
+        .filter(vale__fecha__gte=desde, vale__salida__isnull=True)
+        .values('material_id', 'material__code', 'material__name', 'material__unit')
+        .annotate(
+            total_salidas=Sum('cantidad'),
+            movimientos_salida=Count('vale_id', distinct=True),
+        )
+    )
+    entradas = list(
+        Entrada.objects
+        .filter(fecha__gte=desde)
+        .values('material_id')
+        .annotate(
+            total_entradas=Sum('cantidad'),
+            movimientos_entrada=Count('id'),
+        )
+    )
+
+    merged = {}
+    for row in salidas + vales:
+        mid = row['material_id']
+        item = merged.setdefault(mid, {
+            'material_id': mid,
+            'code': row['material__code'],
+            'name': row['material__name'],
+            'unit': row['material__unit'],
+            'salidas': 0,
+            'entradas': 0,
+            'movimientos_salida': 0,
+            'movimientos_entrada': 0,
+        })
+        item['salidas'] += row['total_salidas'] or 0
+        item['movimientos_salida'] += row['movimientos_salida'] or 0
+
+    for row in entradas:
+        mid = row['material_id']
+        total = row['total_entradas'] or 0
+        movimientos = row['movimientos_entrada'] or 0
+        item = merged.get(mid)
+        if item:
+            item['entradas'] = total
+            item['movimientos_entrada'] = movimientos
+
+    total_salidas = sum(item['salidas'] for item in merged.values())
+    total_entradas = sum(row['total_entradas'] or 0 for row in entradas)
+
+    data = sorted(
+        merged.values(),
+        key=lambda item: (-item['salidas'], -item['movimientos_salida'], item['name']),
+    )[:limite]
+
+    return {
+        'salidas': total_salidas,
+        'entradas': total_entradas,
+        'data': data,
+    }
+
+
+class FlujoMaterialesView(APIView):
+    """
+    Flujo de materiales por periodo: top despachados con sus salidas
+    y entradas para 24 h, 3, 7 y 15 días.
+    """
+    permission_classes = [IsSupervisorOrAbove]
+
+    def get(self, request):
+        try:
+            limite = int(request.query_params.get('limite', 10))
+        except (TypeError, ValueError):
+            limite = 10
+        limite = max(1, min(limite, 20))
+
+        ahora = timezone.now()
+        periodos = []
+        for key, label, delta in PERIODOS_FLUJO:
+            desde = ahora - delta
+            periodo = _flujo_periodo(desde, limite)
+            periodos.append({
+                'key': key,
+                'label': label,
+                'desde': desde,
+                **periodo,
+            })
+
+        return Response({'limite': limite, 'periodos': periodos})
+
+
 class AlertasView(APIView):
     """Materiales en estado 'ordenar' or 'urge'."""
     permission_classes = [IsSupervisorOrAbove]
